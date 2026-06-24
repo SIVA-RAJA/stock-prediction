@@ -1,0 +1,15 @@
+
+*.venv
+.venv
+venv
+
+*.env
+.env
+env
+
+
+*/dataset/*
+*.hd5
+*.parquet
+*.joblib
+*.pkl
