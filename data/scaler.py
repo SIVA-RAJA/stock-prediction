@@ -1,7 +1,6 @@
 import logging
 import joblib
 import pandas as pd
-import numpy as np
 from sklearn.preprocessing import RobustScaler
 from pathlib import Path
 

@@ -127,61 +127,61 @@ def add_featurers(
         return None
 
     df = df.copy()
-    o, h, l, c, v = df['open'], df['high'], df['low'], df['close'], df['volume']
+    open, high, low, close, volume = df['open'], df['high'], df['low'], df['close'], df['volume']
 
     df['ticker_id'] = TICKER_TO_ID.get(ticker, -1)
     df['market_id'] = MARKET_TO_ID.get(market, -1)
     df['region_id'] = REGION_TO_ID.get(region, -1)
 
-    idx = df.index
+    idx = pd.DatetimeIndex(df.index)
     df["sin_minute"], df["cos_minute"] = _sin_cos(pd.Series(idx.minute, index=idx), 60)
     df["sin_hour"], df["cos_hour"] = _sin_cos(pd.Series(idx.hour, index=idx), 24)
     df["sin_day_of_week"], df["cos_day_of_week"] = _sin_cos(pd.Series(idx.dayofweek, index=idx), 7)
     df["sin_day_of_month"], df["cos_day_of_month"] = _sin_cos(pd.Series(idx.day, index=idx), 31)
     df["sin_month"], df["cos_month"] = _sin_cos(pd.Series(idx.month, index=idx), 12)
 
-    df["log_return"] = np.log(c / c.shift(1))
-    df["pct_change"] = c.pct_change()
-    df["hl_range"] = h - l
-    df["co_range"] = c - o
+    df["log_return"] = np.log(close / close.shift(1))
+    df["pct_change"] = close.pct_change()
+    df["hl_range"] = high - low
+    df["co_range"] = close - open
 
     for w in SMA_WINDOWS:
-        df[f"sma_{w}"] = c.rolling(window=w).mean()
+        df[f"sma_{w}"] = close.rolling(window=w).mean()
 
     for w in EMA_WINDOWS:
-        df[f"ema_{w}"] = c.ewm(span=w, min_periods=w).mean()
+        df[f"ema_{w}"] = close.ewm(span=w, min_periods=w).mean()
 
-    df["macd"], df["macd_signal"], df["macd_hist"] = _macd(c, MACD_FAST, MACD_SLOW, MACD_SIGNAL)
+    df["macd"], df["macd_signal"], df["macd_hist"] = _macd(close, MACD_FAST, MACD_SLOW, MACD_SIGNAL)
 
-    df["rsi_{RS}"] = _rsi(c, period=RSI_PERIOD)
+    df[f"rsi_{RSI_PERIOD}"] = _rsi(close, period=RSI_PERIOD)
 
-    df["stoch_k"], df["stoch_d"] = _stochastic(h, l, c, STOCH_WINDOW, STOCH_SMOOTH)
+    df["stoch_k"], df["stoch_d"] = _stochastic(high, low, close, STOCH_WINDOW, STOCH_SMOOTH)
 
-    df["williams_r"] = _williams_r(h, l, c, WILLIAMS_R_PERIOD)
+    df["williams_r"] = _williams_r(high, low, close, WILLIAMS_R_PERIOD)
 
-    df[f"roc_{ROC_PERIOD}"] = c.pct_change(ROC_PERIOD) * 100
+    df[f"roc_{ROC_PERIOD}"] = close.pct_change(ROC_PERIOD) * 100
 
-    df["bb_upper"], df["bb_mid"], df["bb_lower"], df["bb_width"], df["bb_pct"] = _bollinger(c, BB_WINDOW, BB_STD)
+    df["bb_upper"], df["bb_mid"], df["bb_lower"], df["bb_width"], df["bb_pct"] = _bollinger(close, BB_WINDOW, BB_STD)
 
-    df[f"atr_{ATR_PERIOD}"] = _atr(h, l, c, ATR_PERIOD)
+    df[f"atr_{ATR_PERIOD}"] = _atr(high, low, close, ATR_PERIOD)
 
-    df[f"cci_{CCI_PERIOD}"] = _cci(h, l, c, CCI_PERIOD)
+    df[f"cci_{CCI_PERIOD}"] = _cci(high, low, close, CCI_PERIOD)
 
-    df["obv"] = _obv(c, v)
+    df["obv"] = _obv(close, volume)
 
-    df["vwap"] = _vwap_rolling(h, l, c, v, VWAP_PERIOD)
+    df["vwap"] = _vwap_rolling(high, low, close, volume, VWAP_PERIOD)
 
     if market not in ("FOREX", "INDICES"):
-        df[f"mfi_{MFI_PERIOD}"] = _mfi(h, l, c, v, MFI_PERIOD)
+        df[f"mfi_{MFI_PERIOD}"] = _mfi(high, low, close, volume, MFI_PERIOD)
     else:
         df[f"mfi_{MFI_PERIOD}"] = np.nan
 
-    df[f"cmf_{CMF_PERIOD}"] = _cmf(h, l, c, v, CMF_PERIOD)
+    df[f"cmf_{CMF_PERIOD}"] = _cmf(high, low, close, volume, CMF_PERIOD)
 
-    df["volume_zscore"] = _volume_zscore(v, window=20)
+    df["volume_zscore"] = _volume_zscore(volume, window=20)
 
     for lag in LAG_WINDOWS:
-        df[f"close_lag_{lag}"] = c.shift(lag)
+        df[f"close_lag_{lag}"] = close.shift(lag)
         df[f"return_lag_{lag}"] = df["log_return"].shift(lag)
 
     n_before = len(df)

@@ -1,6 +1,5 @@
 import logging
 import pandas as pd
-import numpy as np
 
 from config import MIN_ROWS
 
@@ -94,7 +93,7 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
     n_nan = df.isna().any(axis=1).sum()
     if n_nan:
         log.debug(f"{ticker} @ {interval}: dropping {n_nan} rows with NaN values after ffill")
-        df = df.dropna(inplace=True)
+        df = df.dropna()
 
     df = _remove_outliers_iqr(df, price_cols, factor=5.0)
 

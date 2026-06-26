@@ -83,17 +83,20 @@ def build_embeddings_maps():
 
     for market, regions in TICKERS.items():
         if market not in market_to_id:
-            market_to_id[market] = m_idx; m_idx +=1
+            market_to_id[market] = m_idx
+            m_idx +=1
         for region, tickers in regions.items():
             if region not in region_to_id:
-                region_to_id[region] = r_idx; r_idx += 1
+                region_to_id[region] = r_idx
+                r_idx += 1
             for tk in tickers:
                 if tk not in ticker_to_id:
-                    ticker_to_id[tk] = t_idx; t_idx +=1
+                    ticker_to_id[tk] = t_idx
+                    t_idx +=1
 
     return ticker_to_id, market_to_id, region_to_id
 
-TICKER_TO_ID, MARKER_TO_ID, REGION_TO_ID = build_embeddings_maps()
+TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID = build_embeddings_maps()
 
 MIN_ROWS = 60
 

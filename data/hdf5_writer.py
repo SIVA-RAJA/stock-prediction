@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 import re
+from typing import cast, Any
 
 from config import HDF5_PATH
 
@@ -39,15 +40,17 @@ def write_hdf5(cleaned: dict) -> None:
                         try:
                             store.put(hdf_key, df, format='table', data_columns=True, complevel=5, complib="blosc")
 
-                            store.get_storer(hdf_key).attrs.metadata = {
-                                "market": market,
-                                "region": region,
-                                "ticker": ticker,
-                                "interval": interval,
-                                "rows": len(df),
-                                "start": str(df.index[0]),
-                                "end": str(df.index[-1]),
-                            }
+                            storer = cast(Any, store).get_storer(hdf_key)
+                            if storer is not None:
+                                storer.attrs.metadata = {
+                                    "market": market,
+                                    "region": region,
+                                    "ticker": ticker,
+                                    "interval": interval,
+                                    "rows": len(df),
+                                    "start": str(df.index[0]),
+                                    "end": str(df.index[-1]),
+                                }
 
                             manifest_rows.append({
                                 "market": market,
@@ -77,7 +80,7 @@ def read_hdf5(market: str, region: str, ticker: str, interval: str) -> pd.DataFr
     try:
         with pd.HDFStore(str(HDF5_PATH), mode='r') as store:
             if key in store:
-                df = store[key]
+                df = cast(pd.DataFrame, store[key])
                 return df
             else:
                 log.warning(f"Key {key} not found in HDF5 store")
@@ -91,7 +94,7 @@ def list_hdf5_keys() -> pd.DataFrame:
     try:
         with pd.HDFStore(str(HDF5_PATH), mode='r') as store:
             if "/manifest" in store:
-                manifest_df = store["/manifest"]
+                manifest_df = cast(pd.DataFrame, store["/manifest"])
                 return manifest_df
     except Exception as e:
         log.error(f"Failed to read manifest from HDF5: {e}")
