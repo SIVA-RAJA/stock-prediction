@@ -10,7 +10,7 @@ LOG_DIR = BASE_DIR / "runs"
 
 for d in [CHECKPOINT_DIR, LOG_DIR]:
     d.mkdir(parents=True, exist_ok=True)
-    
+
 DEVICE = (
     "cuda" if torch.cuda.is_available() else
     "mps" if torch.backends.mps.is_available() else
@@ -35,7 +35,7 @@ HEAD_HIDDEN = 128
 HEAD_DROPOUT = 0.3
 
 LAMBDA_PRICE = 1.0
-LAMBDAD_DIR = 0.5
+LAMBDA_DIR = 0.5
 
 BATCH_SIZE = 512
 NUM_EPOCHS = 100
