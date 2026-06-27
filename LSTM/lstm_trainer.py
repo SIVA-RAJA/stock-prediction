@@ -69,6 +69,7 @@ def _run_epoch(
             loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir)
 
             if is_train:
+                assert optimizer is not None, "optimizer must be provided when is_train=True"
                 optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
