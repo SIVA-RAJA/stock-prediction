@@ -5,8 +5,9 @@ DATA_DIR = BASE_DIR / "dataset"
 HDF5_PATH = DATA_DIR / "market_data.hd5"
 PARQUET_DIR = DATA_DIR / "parquet"
 SCALER_DIR = DATA_DIR / "scalers"
+MMAP_DIR = DATA_DIR / "mmap"
 
-for d in [DATA_DIR, PARQUET_DIR, SCALER_DIR]:
+for d in [DATA_DIR, PARQUET_DIR, SCALER_DIR, MMAP_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 CONFIGS = {
@@ -15,13 +16,15 @@ CONFIGS = {
     "5m":  ("60d",  "5m"),
     "15m": ("60d",  "15m"),
     "30m": ("60d",  "30m"),
+    "60m": ("60d",  "60m"),
     "90m": ("60d",  "90m"),
     "1h":  ("730d", "1h"),
+    "4h":  ("730d", "4h"),
     "1d":  ("max",  "1d"),
+    "5d": ("max",  "5d"),
     "1wk": ("max",  "1wk"),
     "1mo": ("max",  "1mo"),
     "3mo": ("max",  "3mo"),
-    "max": ("max", "1d"),
 }
 
 
@@ -79,6 +82,7 @@ COMPANY_NAMES = {
 
 def build_embeddings_maps():
     ticker_to_id , market_to_id, region_to_id = {}, {}, {}
+    interval_to_id = {iv: i for i, iv in enumerate(CONFIGS.keys())}
     t_idx = m_idx = r_idx = 0
 
     for market, regions in TICKERS.items():
@@ -94,9 +98,9 @@ def build_embeddings_maps():
                     ticker_to_id[tk] = t_idx
                     t_idx +=1
 
-    return ticker_to_id, market_to_id, region_to_id
+    return ticker_to_id, market_to_id, region_to_id, interval_to_id
 
-TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID = build_embeddings_maps()
+TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID = build_embeddings_maps()
 
 MIN_ROWS = 60
 
@@ -118,3 +122,4 @@ ROC_PERIOD = 10
 CMF_PERIOD = 20
 CCI_PERIOD = 20
 VWAP_PERIOD = 14
+MARKET_REGIME_WINDOW = 20

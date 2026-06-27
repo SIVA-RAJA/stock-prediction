@@ -4,20 +4,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from pathlib import Path
 
-from config import PARQUET_DIR
+from config import DATA_DIR
 
 log = logging.getLogger(__name__)
 
-def _partition_path(market: str, interval: str, region: str) -> Path:
-    p = PARQUET_DIR / f"{market}" / f"{interval}" / f"{region}"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
+FLAT_PARQUET = DATA_DIR / "market_data_full.parquet"
 def write_parquet(scaled: dict) -> None:
 
-    log.info(f"Writing Parquet files to {PARQUET_DIR}")
-
-    partitions: dict[tuple, list[pd.DataFrame]] = {}
+    log.info(f"Assembeling single Parquet file: {FLAT_PARQUET}")
+    all_dfs = []
 
     for market, regions in scaled.items():
         for region, tickers in regions.items():
@@ -35,27 +30,23 @@ def write_parquet(scaled: dict) -> None:
                     df_out.insert(2, "region", region)
                     df_out.insert(3, "interval", interval)
 
-                    key = (market, interval, region)
-                    partitions.setdefault(key, []).append(df_out)
+                    all_dfs.append(df_out)
 
-    total_files = 0
-    total_rows = 0
+    if not all_dfs:
+        raise ValueError("No data to write to Parquet")
 
-    for (market, interval, region), dfs in partitions.items():
-        combined = pd.concat(dfs, ignore_index=True)
-        out_path = _partition_path(market, interval, region) / "part.0.parquet"
+    combined = pd.concat(all_dfs, ignore_index=True)
+    log.info(f"Total rows to write: {len(combined):,} | columns: {list(combined.columns)}")
 
-        table = pa.Table.from_pandas(combined, preserve_index=False)
-        pq.write_table(table, str(out_path), compression="snappy", row_group_size=50_000,)
+    table = pa.Table.from_pandas(combined, preserve_index=False)
+    pq.write_table(table, str(FLAT_PARQUET), compression="snappy", row_group_size=100_000,)
+    log.info(f"Parquet writing completed: {FLAT_PARQUET} | size: {FLAT_PARQUET.stat().st_size / 1e6:.1f} MB")
 
-        total_files += 1
-        total_rows += len(combined)
-        log.debug(f"{out_path.relative_to(PARQUET_DIR)}: {len(combined)} rows written")
-    log.info(f"Parquet writing completed: {total_files} files, {total_rows} total rows")
-
-def read_parquet(market: str | None = None, interval: str | None = None, region: str | None = None) -> pd.DataFrame:
+def read_parquet(ticker: str | None = None, market: str | None = None, interval: str | None = None, region: str | None = None) -> pd.DataFrame:
 
     filters = []
+    if ticker:
+        filters.append(("ticker", "=", ticker))
     if market:
         filters.append(("market", "=", market))
     if interval:
@@ -63,7 +54,7 @@ def read_parquet(market: str | None = None, interval: str | None = None, region:
     if region:
         filters.append(("region", "=", region))
 
-    dataset = pq.read_table(str(PARQUET_DIR), filters=filters if filters else None,)
+    dataset = pq.read_table(str(FLAT_PARQUET), filters=filters if filters else None,)
     df = dataset.to_pandas()
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
     return df

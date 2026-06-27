@@ -9,13 +9,13 @@ from config import SCALER_DIR
 log = logging.getLogger(__name__)
 
 _NO_SCALE_PREFIXS = ("sin_", "cos_")
-_NO_SCALE_EXACT = {"ticker_id", "market_id", "region_id"}
+_NO_SCALE = {"ticker_id", "market_id", "region_id", "interval_id", "regime"}
 
 def _scalable_cols(df: pd.DataFrame) -> list[str]:
 
     cols = []
     for col in df.columns:
-        if col in _NO_SCALE_EXACT:
+        if col in _NO_SCALE:
             continue
         if any(col.startswith(prefix) for prefix in _NO_SCALE_PREFIXS):
             continue

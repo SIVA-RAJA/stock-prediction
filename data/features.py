@@ -2,11 +2,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from config import (
-    TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, SMA_WINDOWS, EMA_WINDOWS, LAG_WINDOWS,
-    ATR_PERIOD, RSI_PERIOD, MFI_PERIOD, MACD_FAST, MACD_SLOW, MACD_SIGNAL, BB_WINDOW,
-    BB_STD, STOCH_WINDOW, STOCH_SMOOTH, WILLIAMS_R_PERIOD, ROC_PERIOD, CMF_PERIOD, CCI_PERIOD, MIN_ROWS, VWAP_PERIOD
-)
+from config import *
 
 log = logging.getLogger(__name__)
 
@@ -115,12 +111,28 @@ def _volume_zscore(volume, window=20):
     z_score = (volume - mean) / std.replace(0, np.nan)
     return z_score
 
+def _window_normalize(df):
+    base = df["close"].iloc[0]
+    if base == 0 or np.isnan(base):
+        base = 1.0
+    price_cols = ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap"] + [f"sma_{w}" for w in SMA_WINDOWS] + [f"ema_{w}" for w in EMA_WINDOWS] + [f"close_lag_{lag}" for lag in LAG_WINDOWS]
 
+    for col in price_cols:
+        if col in df.columns:
+            df[col] = df[col] / base
+    return df
+
+def _market_regime(close, window=20):
+    ret = close.pct_change(window)
+    std = close.pct_change().rolling(window).std()
+    regime = np.where(ret > std, 1, np.where(ret < -std, -1, 0))
+    return pd.Series(regime, index=close.index, dtype=np.float32)
 
 def add_featurers(
         df: pd.DataFrame,
         ticker: str,
         market: str,
+        interval: str,
         region: str,) -> pd.DataFrame | None:
 
     if df is None or df.empty:
@@ -129,9 +141,10 @@ def add_featurers(
     df = df.copy()
     open, high, low, close, volume = df['open'], df['high'], df['low'], df['close'], df['volume']
 
-    df['ticker_id'] = TICKER_TO_ID.get(ticker, -1)
-    df['market_id'] = MARKET_TO_ID.get(market, -1)
-    df['region_id'] = REGION_TO_ID.get(region, -1)
+    df['ticker_id'] = TICKER_TO_ID.get(ticker, 0)
+    df['market_id'] = MARKET_TO_ID.get(market, 0)
+    df['region_id'] = REGION_TO_ID.get(region, 0)
+    df["interval_id"] = INTERVAL_TO_ID.get(interval, 0)
 
     idx = pd.DatetimeIndex(df.index)
     df["sin_minute"], df["cos_minute"] = _sin_cos(pd.Series(idx.minute, index=idx), 60)
@@ -184,6 +197,10 @@ def add_featurers(
         df[f"close_lag_{lag}"] = close.shift(lag)
         df[f"return_lag_{lag}"] = df["log_return"].shift(lag)
 
+    df["market_regime"] = _market_regime(close, window=MARKET_REGIME_WINDOW)
+
+    df = _window_normalize(df)
+
     n_before = len(df)
     df.dropna(inplace=True)
     n_after = len(df)
@@ -205,7 +222,7 @@ def add_features_all(cleaned: dict) -> dict:
             for ticker, intervals in tickers.items():
                 featured[market][region][ticker] = {}
                 for interval, df in intervals.items():
-                    result = add_featurers(df, ticker, market, region)
+                    result = add_featurers(df, ticker, market, region, interval)
                     if result is not None:
                         featured[market][region][ticker][interval] = result
                         ok += 1
