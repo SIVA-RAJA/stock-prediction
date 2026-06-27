@@ -1,5 +1,4 @@
 import logging
-import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -154,12 +153,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     best_val_loss = float("inf")
 
     for epoch in range(1, NUM_EPOCHS + 1):
-        t0 = time.time()
+
         tr_loss, tr_lp, tr_ld, tr_m = _run_epoch(model, train_loader, criterion, optimizer, is_train=True)
         val_loss, val_lp, val_ld, val_m = _run_epoch(model, val_loader, criterion, None, is_train=False)
 
         scheduler.step()
-        elapsed = time.time() - t0
 
         writer.add_scalar("Loss/total", {"train": tr_loss, "val": val_loss}, epoch)
         writer.add_scalar("Loss/price", {"train": tr_lp, "val": val_lp}, epoch)
@@ -183,6 +181,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     writer.close()
 
     load_checkpoint(model, path=BEST_CKPT)
-    log.info(f"Training completed. Best model loaded")
+    log.info("Training completed. Best model loaded")
 
     return model

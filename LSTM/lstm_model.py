@@ -1,6 +1,3 @@
-from turtle import forward
-from typing import Any
-
 import torch
 import torch.nn as nn
 from lstm_config import( TICKER_EMB_DIM, MARKET_EMB_DIM, REGION_EMB_DIM, LSTM_HIDDEN, LSTM_LAYERS, LSTM_DROPOUT,BIDIRECTIONAL, ATTN_HIDDEN, HEAD_HIDDEN, HEAD_DROPOUT, )

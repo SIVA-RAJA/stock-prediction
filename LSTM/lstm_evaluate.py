@@ -4,14 +4,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
 from lstm_config import DEVICE, CHECKPOINT_DIR
-from lstm_trainer import load_checkpoint
 from data.scaler import load_scaler
 
 

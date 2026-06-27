@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import torch
-from torch.utils.data import Dataset, DataLoader, ConcatDataset
+from torch.utils.data import Dataset, DataLoader
 
 from lstm_config import (
-    PARQUET_DIR, SEQ_LEN, PRED_HORIZON, STRIDE, TRAIN_FRAC, VAL_FRAC, BATCH_SIZE, NUM_WORKERS, PIN_MEMORY, DEVICE
+    PARQUET_DIR, SEQ_LEN, PRED_HORIZON, STRIDE, TRAIN_FRAC, VAL_FRAC, BATCH_SIZE, NUM_WORKERS, PIN_MEMORY
 )
 
 log = logging.getLogger(__name__)
@@ -18,9 +18,12 @@ EXCLUDE_COLS = EMB_COLS + ["datetime", "ticker", "market", "region", "interval"]
 def _loada_partition(market: str | None = None, interval: str | None = None, region: str | None = None,) -> pd.DataFrame:
 
     filters = []
-    if market: filters.append(("market", "=", market))
-    if interval: filters.append(("interval", "=", interval))
-    if region: filters.append(("region", "=", region))
+    if market:
+        filters.append(("market", "=", market))
+    if interval:
+        filters.append(("interval", "=", interval))
+    if region:
+        filters.append(("region", "=", region))
 
     table = pq.read_table(str(PARQUET_DIR), filters=filters if filters else None)
     df = table.to_pandas()

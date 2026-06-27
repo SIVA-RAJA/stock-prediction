@@ -1,9 +1,6 @@
 import torch
 import logging
-from pathlib import Path
-
-from lstm_config import DEVICE, CHECKPOINT_DIR, SEQ_LEN
-from lstm_trainer import load_checkpoint
+from lstm_config import CHECKPOINT_DIR, SEQ_LEN
 
 log = logging.getLogger(__name__)
 ONNX_PATH = CHECKPOINT_DIR / "market_lstm.onnx"
