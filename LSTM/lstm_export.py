@@ -11,7 +11,7 @@ def export_onnx(model, num_features: int):
     model.to("cpu")
 
     dummy_x_num = torch.randn(1, SEQ_LEN, num_features)
-    dummy_x_emb = torch.zeros(1, 3, dtype=torch.long)
+    dummy_x_emb = torch.zeros(1, 4, dtype=torch.long)
 
     torch.onnx.export(
         model,
@@ -39,7 +39,7 @@ def verify_onnx(num_features: int):
 
     sess = ort.InferenceSession(str(ONNX_PATH))
     dummy_num = np.random.randn(2, SEQ_LEN, num_features).astype(np.float32)
-    dummy_emb = np.zeros((2,3), dtype=np.int64)
+    dummy_emb = np.zeros((2,4), dtype=np.int64)
 
     outputs = sess.run(None, {"x_num": dummy_num, "x_emb": dummy_emb})
     log.info(f"ONNX verified - output shapes: {[np.asanyarray(o).shape for o in outputs]}")
