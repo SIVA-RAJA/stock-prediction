@@ -1,3 +1,10 @@
+"""
+Usage:
+        python pipeline.py                # Download, clean, feature engineering, scaling, and write to HDF5 and Parquet
+        python pipeline.py --skip-download   # Skip downloading raw data and use cached data if available
+"""
+
+
 import argparse
 import logging
 import pickle

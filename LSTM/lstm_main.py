@@ -1,3 +1,15 @@
+"""
+Usage:
+        python lstm_main.py                              # Train and evaluate the LSTM model
+        python lstm_main.py --eval-only                  # Evaluate only
+        python lstm_main.py --export                     # Export to ONNX
+        python lstm_main.py --rebuild                    # Force rebuild LSTM mmap cache
+
+        tensorboard --logdir runs/                       # Start TensorBoard to visualize training metrics (live)
+
+"""
+
+
 import argparse
 import logging
 from data.config import TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID
