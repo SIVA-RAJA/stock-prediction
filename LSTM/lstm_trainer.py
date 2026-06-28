@@ -1,4 +1,5 @@
 import logging
+import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,7 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 
 from lstm_config import (
-    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE, MIN_DELTA, SCHEDULER_TO, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT, LOG_DIR,
+    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE,
+    MIN_DELTA, SCHEDULER_TO, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT, LOG_DIR,
 )
 
 log = logging.getLogger(__name__)
@@ -154,24 +156,30 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
     for epoch in range(1, NUM_EPOCHS + 1):
 
+        t0 = time.time()
         tr_loss, tr_lp, tr_ld, tr_m = _run_epoch(model, train_loader, criterion, optimizer, is_train=True)
         val_loss, val_lp, val_ld, val_m = _run_epoch(model, val_loader, criterion, None, is_train=False)
 
         scheduler.step()
 
-        writer.add_scalar("Loss/total", {"train": tr_loss, "val": val_loss}, epoch)
-        writer.add_scalar("Loss/price", {"train": tr_lp, "val": val_lp}, epoch)
-        writer.add_scalar("Loss/direction", {"train": tr_ld, "val": val_ld}, epoch)
-        writer.add_scalar("Metrics/MAE", {"train": tr_m["mae"], "val": val_m["mae"]}, epoch)
-        writer.add_scalar("Metrics/RMSE", {"train": tr_m["rmse"], "val": val_m["rmse"]}, epoch)
-        writer.add_scalar("Metrics/Direction Accuracy", {"train": tr_m["dir_acc"], "val": val_m["dir_acc"]}, epoch)
-        writer.add_scalar("Metrics/F1 Score", {"train": tr_m["f1"], "val": val_m["f1"]}, epoch)
-        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], epoch)
+        log.info(f"Epoch {epoch}/{NUM_EPOCHS} | "
+                 f"Train Loss: {tr_loss:.6f} (Price: {tr_lp:.6f}, Dir: {tr_ld:.6f}) | "
+                 f"Val Loss: {val_loss:.6f} (Price: {val_lp:.6f}, Dir: {val_ld:.6f}) | "
+                 f"Time: {time.time() - t0:.2f}s")
+
+        writer.add_scalars("Loss/total", {"train": tr_loss, "val": val_loss}, epoch)
+        writer.add_scalars("Loss/price", {"train": tr_lp, "val": val_lp}, epoch)
+        writer.add_scalars("Loss/direction", {"train": tr_ld, "val": val_ld}, epoch)
+        writer.add_scalars("Metrics/MAE", {"train": tr_m["mae"], "val": val_m["mae"]}, epoch)
+        writer.add_scalars("Metrics/RMSE", {"train": tr_m["rmse"], "val": val_m["rmse"]}, epoch)
+        writer.add_scalars("Metrics/Direction Accuracy", {"train": tr_m["dir_acc"], "val": val_m["dir_acc"]}, epoch)
+        writer.add_scalars("Metrics/F1 Score", {"train": tr_m["f1"], "val": val_m["f1"]}, epoch)
+        writer.add_scalars("Learning Rate", optimizer.param_groups[0]["lr"], epoch)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             _save_checkpoint(model, optimizer, scheduler, epoch, val_loss, BEST_CKPT)
-
+            log.info(f"New best model saved at epoch {epoch} with val_loss={val_loss:.6f}")
         _save_checkpoint(model, optimizer, scheduler, epoch, val_loss, LAST_CKPT)
 
         if early_stop.step(val_loss):
@@ -181,6 +189,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     writer.close()
 
     load_checkpoint(model, path=BEST_CKPT)
-    log.info("Training completed. Best model loaded")
+    log.info("Training completed. Best weights loaded")
 
     return model
