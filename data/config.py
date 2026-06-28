@@ -82,8 +82,8 @@ COMPANY_NAMES = {
 
 def build_embeddings_maps():
     ticker_to_id , market_to_id, region_to_id = {}, {}, {}
-    interval_to_id = {iv: i for i, iv in enumerate(CONFIGS.keys())}
-    t_idx = m_idx = r_idx = 0
+    interval_to_id = {iv: i for i, iv in enumerate(CONFIGS.keys(), start=1)}
+    t_idx = m_idx = r_idx = 1
 
     for market, regions in TICKERS.items():
         if market not in market_to_id:

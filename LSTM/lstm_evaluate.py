@@ -25,10 +25,10 @@ def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np
         return scaled_values
 
     scaler, cols = bundle
-    if "Close" not in cols:
+    if "close" not in cols:
         return scaled_values
 
-    close_idx = cols.index("Close")
+    close_idx = cols.index("close")
 
     dummy = np.zeros((len(scaled_values), len(cols)))
     dummy[:, close_idx] = scaled_values

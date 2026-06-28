@@ -79,7 +79,7 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
         log.debug(f"{ticker} @ {interval}: dropping {bad_h.sum()} rows with high < low")
         df = df[~bad_h]
 
-    bad_close = df['close'] < df['low']
+    bad_close = (df['close'] < df['low']) | (df['close'] > df['high'])
     if bad_close.sum():
         log.debug(f"{ticker} @ {interval}: dropping {bad_close.sum()} close-out-of-range rows")
         df = df[~bad_close]

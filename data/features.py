@@ -132,8 +132,8 @@ def add_featurers(
         df: pd.DataFrame,
         ticker: str,
         market: str,
-        interval: str,
-        region: str,) -> pd.DataFrame | None:
+        region: str,
+        interval: str,) -> pd.DataFrame | None:
 
     if df is None or df.empty:
         return None

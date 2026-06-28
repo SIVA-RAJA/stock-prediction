@@ -8,6 +8,12 @@ from lstm_trainer import train, load_checkpoint
 from lstm_evaluate import evaluate
 from lstm_export import export_onnx, verify_onnx
 
+import sys
+from pathlib import Path
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "data"))
+
 
 logging.basicConfig(
     level=logging.INFO,

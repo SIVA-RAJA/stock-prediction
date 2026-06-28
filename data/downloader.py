@@ -26,7 +26,7 @@ def _flat_tickers() -> list[str]:
 @retry(
     retry=retry_if_exception_type((requests.exceptions.ConnectionError,
                                    requests.exceptions.Timeout,
-                                   Exception)),
+                                )),
     wait=wait_exponential(multiplier=2, min=4, max=60),
     stop=stop_after_attempt(5),
     reraise=True,

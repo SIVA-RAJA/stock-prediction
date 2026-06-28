@@ -106,13 +106,10 @@ def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
                 break
 
             window = vals[row:end].copy()
-            base = window[0, close_idx]
-            if base != 0 and not np.isnan(base):
-                window[:, close_idx] /= base
-
+            
             X_num[cursor] = window
             X_emb[cursor] = emb[end - 1]
-            y_price[cursor] = vals[target, close_idx] / (base if base != 0 else 1.0)
+            y_price[cursor] = vals[target, close_idx]
             y_dir[cursor] = float(vals[target, close_idx] > vals[end - 1, close_idx])
             cursor += 1
             row += STRIDE

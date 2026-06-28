@@ -128,7 +128,7 @@ def _save_checkpoint(model, optimizer,scheduler, epoch,val_loss, path):
 
 def load_checkpoint(model, optimizer=None, scheduler=None, path=BEST_CKPT):
 
-    ckpt = torch.load(path, map_location=DEVICE)
+    ckpt = torch.load(path, map_location=DEVICE, weights_only=False)
     model.load_state_dict(ckpt["model"])
     if optimizer:
         optimizer.load_state_dict(ckpt["optimizer"])
@@ -174,7 +174,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         writer.add_scalars("Metrics/RMSE", {"train": tr_m["rmse"], "val": val_m["rmse"]}, epoch)
         writer.add_scalars("Metrics/Direction Accuracy", {"train": tr_m["dir_acc"], "val": val_m["dir_acc"]}, epoch)
         writer.add_scalars("Metrics/F1 Score", {"train": tr_m["f1"], "val": val_m["f1"]}, epoch)
-        writer.add_scalars("Learning Rate", optimizer.param_groups[0]["lr"], epoch)
+        writer.add_scalars("Learning Rate", {"lr": optimizer.param_groups[0]["lr"]}, epoch)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
