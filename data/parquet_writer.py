@@ -2,16 +2,14 @@ import logging
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from pathlib import Path
 
-from config import DATA_DIR
+from config import PARQUET_PATH
 
 log = logging.getLogger(__name__)
 
-FLAT_PARQUET = DATA_DIR / "market_data_full.parquet"
 def write_parquet(scaled: dict) -> None:
 
-    log.info(f"Assembeling single Parquet file: {FLAT_PARQUET}")
+    log.info(f"Assembeling single Parquet file: {PARQUET_PATH}")
     all_dfs = []
 
     for market, regions in scaled.items():
@@ -39,8 +37,8 @@ def write_parquet(scaled: dict) -> None:
     log.info(f"Total rows to write: {len(combined):,} | columns: {list(combined.columns)}")
 
     table = pa.Table.from_pandas(combined, preserve_index=False)
-    pq.write_table(table, str(FLAT_PARQUET), compression="snappy", row_group_size=100_000,)
-    log.info(f"Parquet writing completed: {FLAT_PARQUET} | size: {FLAT_PARQUET.stat().st_size / 1e6:.1f} MB")
+    pq.write_table(table, str(PARQUET_PATH), compression="snappy", row_group_size=100_000,)
+    log.info(f"Parquet writing completed: {PARQUET_PATH} | size: {PARQUET_PATH.stat().st_size / 1e6:.1f} MB")
 
 def read_parquet(ticker: str | None = None, market: str | None = None, interval: str | None = None, region: str | None = None) -> pd.DataFrame:
 
@@ -54,7 +52,7 @@ def read_parquet(ticker: str | None = None, market: str | None = None, interval:
     if region:
         filters.append(("region", "=", region))
 
-    dataset = pq.read_table(str(FLAT_PARQUET), filters=filters if filters else None,)
+    dataset = pq.read_table(str(PARQUET_PATH), filters=filters if filters else None,)
     df = dataset.to_pandas()
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
     return df

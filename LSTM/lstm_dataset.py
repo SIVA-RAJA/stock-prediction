@@ -1,140 +1,179 @@
 import logging
+from typing import Any
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
+from pathlib import Path
 import torch
 from torch.utils.data import Dataset, DataLoader
 
 from lstm_config import (
-    PARQUET_DIR, SEQ_LEN, PRED_HORIZON, STRIDE, TRAIN_FRAC, VAL_FRAC, BATCH_SIZE, NUM_WORKERS, PIN_MEMORY
+    SEQ_LEN, PRED_HORIZON, STRIDE, TRAIN_FRAC, VAL_FRAC, BATCH_SIZE, NUM_WORKERS, PIN_MEMORY, MMAP_DIR
 )
+from data.config import PARQUET_PATH
 
 log = logging.getLogger(__name__)
 
-EMB_COLS = ["ticker_id", "market_id", "region_id"]
+EMB_COLS = ["ticker_id", "market_id", "region_id", "interval_id"]
 
 EXCLUDE_COLS = EMB_COLS + ["datetime", "ticker", "market", "region", "interval"]
 
-def _loada_partition(market: str | None = None, interval: str | None = None, region: str | None = None,) -> pd.DataFrame:
+def _load_parquet() -> pd.DataFrame:
 
-    filters = []
-    if market:
-        filters.append(("market", "=", market))
-    if interval:
-        filters.append(("interval", "=", interval))
-    if region:
-        filters.append(("region", "=", region))
-
-    table = pq.read_table(str(PARQUET_DIR), filters=filters if filters else None)
+    table = pq.read_table(str(PARQUET_PATH))
     df = table.to_pandas()
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
-    df.sort_values(["ticker", "datetime"], inplace = True)
+    df.sort_values(["ticker", "interval", "datetime"], inplace = True)
     df.reset_index(drop = True, inplace = True)
+    log.info(f"Loaded {len(df):,} rows | {df['ticker'].nunique():,} tickers | {df['interval'].nunique():,} intervals")
     return df
 
-def _build_windows(df_ticker: pd.DataFrame, seq_len: int, horizon: int, stride: int, ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | tuple[None, None, None, None]:
-    num_cols = [c for c in df_ticker.columns if c not in EXCLUDE_COLS]
+def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
+
+    outdir = Path(MMAP_DIR) / split
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    paths = {
+        "X_num": outdir / "X_num.npy",
+        "X_emb": outdir / "X_emb.npy",
+        "y_price": outdir / "y_price.npy",
+        "y_dir": outdir / "y_dir.npy",
+        "meta": outdir / "meta.npz",
+    }
+
+    if not force_rebuild and all(p.exists() for p in paths.values()):
+        log.info(f"Loading cached mmap [{split}] ...")
+        meta = np.load(paths["meta"])
+        N, F = int(meta["N"]), int(meta["F"])
+        X_num = np.load(str(paths["X_num"]), mmap_mode="r")
+        X_emb = np.load(str(paths["X_emb"]), mmap_mode="r")
+        y_price = np.load(str(paths["y_price"]), mmap_mode="r")
+        y_dir = np.load(str(paths["y_dir"]), mmap_mode="r")
+        log.info(f"[{split}] {N:,} windows | {F} features")
+        return X_num, X_emb, y_price, y_dir, F
+
+    log.info(f"Building mmap [{split}] from {len(df):,} rows ...")
+
+    num_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
+    num_features = len(num_cols)
     close_idx = num_cols.index("close")
 
-    values = df_ticker[num_cols].values.astype(np.float32)
-    emb_vals = df_ticker[EMB_COLS].values.astype(np.int64)
+    total_windows = 0
+    groups = []
 
-    X_num, X_emb, y_price, y_dir = [], [], [], []
+    for (ticker, interval), group in df.groupby(["ticker", "interval"], sort=False):
+        group = group.sort_values("datetime").reset_index(drop=True)
+        n = len(group)
+        n_tr = int(n * TRAIN_FRAC)
+        n_val = int(n * VAL_FRAC)
 
-    total = len(values)
-    for start in range(0, total - seq_len - horizon + 1, stride):
-        end = start + seq_len
-        target = end + horizon - 1
+        if split == "train":
+            g = group.iloc[:n_tr]
+        elif split == "val":
+            g = group.iloc[n_tr:n_tr+n_val]
+        else:
+            g = group.iloc[n_tr+n_val:]
 
-        x_window = values[start:end]
-        e_window = emb_vals[end - 1]
+        usable = len(g) - SEQ_LEN - PRED_HORIZON + 1
+        if usable <= 0:
+            continue
 
-        close_now = values[end - 1, close_idx]
-        close_future = values[target, close_idx]
+        n_windows = (usable + STRIDE - 1) // STRIDE
+        groups.append((ticker, interval, g, n_windows))
+        total_windows += n_windows
 
-        direction = 1.0 if close_future > close_now else 0.0
+    if total_windows == 0:
+        raise ValueError(f"No windows could be built for split={split}.")
 
-        X_num.append(x_window)
-        X_emb.append(e_window)
-        y_price.append(close_future)
-        y_dir.append(direction)
+    size_gb = total_windows * SEQ_LEN * num_features * 4 / 1e9
+    log.info(f"[{split}] Pre-allocating {total_windows:,} windows | {num_features} features | {size_gb:.2f} GB")
 
-    if not X_num:
-        return None, None, None, None
+    X_num = np.lib.format.open_memmap(str(paths["X_num"]), mode="w+", dtype=np.float32, shape=(total_windows, SEQ_LEN, num_features))
+    X_emb = np.lib.format.open_memmap(str(paths["X_emb"]), mode="w+", dtype=np.int64, shape=(total_windows, len(EMB_COLS)))
+    y_price = np.lib.format.open_memmap(str(paths["y_price"]), mode="w+", dtype=np.float32, shape=(total_windows, ))
+    y_dir = np.lib.format.open_memmap(str(paths["y_dir"]), mode="w+", dtype=np.float32, shape=(total_windows, ))
 
-    return (
-        np.stack(X_num, axis=0),
-        np.stack(X_emb, axis=0),
-        np.array(y_price, dtype=np.float32),
-        np.array(y_dir, dtype=np.float32),
-    )
+    cursor = 0
+    for ticker, interval, g, _ in groups:
+        vals = g[num_cols].values.astype(np.float32)
+        emb = g[EMB_COLS].values.astype(np.int64)
+        row = 0
+
+        while True:
+            end = row + SEQ_LEN
+            target = end + PRED_HORIZON - 1
+            if target >= len(vals):
+                break
+
+            window = vals[row:end].copy()
+            base = window[0, close_idx]
+            if base != 0 and not np.isnan(base):
+                window[:, close_idx] /= base
+
+            X_num[cursor] = window
+            X_emb[cursor] = emb[end - 1]
+            y_price[cursor] = vals[target, close_idx] / (base if base != 0 else 1.0)
+            y_dir[cursor] = float(vals[target, close_idx] > vals[end - 1, close_idx])
+            cursor += 1
+            row += STRIDE
+
+    actual = cursor
+    log.info(f"[{split}] Built {actual:,} windows")
+    np.savez(str(paths["meta"]), N=actual, F=num_features)
+
+    del X_num, X_emb, y_price, y_dir
+
+    X_num = np.load(str(paths["X_num"]), mmap_mode="r")[:actual]
+    X_emb = np.load(str(paths["X_emb"]), mmap_mode="r")[:actual]
+    y_price = np.load(str(paths["y_price"]), mmap_mode="r")[:actual]
+    y_dir = np.load(str(paths["y_dir"]), mmap_mode="r")[:actual]
+
+    return X_num, X_emb, y_price, y_dir, num_features
+
 
 class MarketDataset(Dataset):
 
-    def __init__(self, df: pd.DataFrame, seq_len: int = SEQ_LEN, horizon: int = PRED_HORIZON, stride: int = STRIDE, ):
-        self.seq_len = seq_len
-        self.horizon = horizon
+    def __init__(self, X_num, X_emb, y_price, y_dir,):
 
-        all_X_num, all_X_emb, all_y_price, all_y_dir = [], [], [], []
-
-        for ticker, group, in df.groupby("ticker", sort=False):
-            group = group.sort_values("datetime").reset_index(drop=True)
-            Xn, Xe, yp, yd = _build_windows(group, seq_len, horizon, stride)
-
-            if Xn is None:
-                log.warning(f" Not enough rows for {ticker}, skipping")
-                continue
-            all_X_num.append(Xn)
-            all_X_emb.append(Xe)
-            all_y_price.append(yp)
-            all_y_dir.append(yd)
-
-        if not all_X_num:
-            raise ValueError("No windows could be built from this partition.")
-
-        self.X_num = torch.from_numpy(np.concatenate(all_X_num, axis=0))
-        self.X_emb = torch.from_numpy(np.concatenate(all_X_emb, axis=0))
-        self.y_price = torch.from_numpy(np.concatenate(all_y_price, axis=0))
-        self.y_dir = torch.from_numpy(np.concatenate(all_y_dir, axis=0))
-
-        log.info(f" Dataset built:{len(self):,} windows | "
-                 f" features={self.X_num.shape[-1]} seq={seq_len}")
+        self.X_num = X_num
+        self.X_emb = X_emb
+        self.y_price = y_price
+        self.y_dir = y_dir
 
     def __len__(self):
-        return len(self.X_num)
+        return len(self.y_price)
 
     def __getitem__(self, idx):
         return (
-            self.X_num[idx],
-            self.X_emb[idx],
-            self.y_price[idx],
-            self.y_dir[idx],
+            torch.from_numpy(self.X_num[idx].copy()),
+            torch.from_numpy(self.X_emb[idx].copy()),
+            torch.tensor(self.y_price[idx], dtype=torch.float32),
+            torch.tensor(self.y_dir[idx], dtype=torch.float32),
         )
 
-def chronological_split(dataset: MarketDataset, train_frac: float = TRAIN_FRAC, val_frac: float = VAL_FRAC, ) -> tuple[Dataset, Dataset, Dataset]:
-    n = len(dataset)
-    n_train = int(n * train_frac)
-    n_val = int(n * val_frac)
 
-    train_ds = torch.utils.data.Subset(dataset, range(0, n_train))
-    val_ds = torch.utils.data.Subset(dataset, range(n_train, n_train + n_val))
-    test_ds = torch.utils.data.Subset(dataset, range(n_train+n_val, n))
+def make_dataloaders(force_rebuild: bool = False):
 
-    log.info(f"Split -> tain={len(train_ds):,} val{len(val_ds):,} test={len(test_ds):,}")
-    return train_ds, val_ds, test_ds
+    df = _load_parquet()
+    num_features = None
+    loaders = {}
 
-def make_dataloaders(market: str | None = None, interval: str | None = None, region: str | None = None) -> tuple[DataLoader, DataLoader, DataLoader, int]:
+    for split in ("train", "val", "test"):
+        X_num, X_emb, y_price, y_dir, nf = _build_mmap(df, split, force_rebuild=force_rebuild)
+        if num_features is None:
+            num_features = nf
 
-    log.info(f"Loading data: market={market}, interval={interval}, region={region}")
-    df = _loada_partition(market, interval, region)
-    log.info(f"Loaded {len(df):,} roes, {df['ticker'].nunique()} tickers")
+        ds = MarketDataset(X_num, X_emb, y_price, y_dir)
+        loaders[split] = DataLoader(
+            ds,
+            batch_size=BATCH_SIZE,
+            shuffle=(split == "train"),
+            num_workers=NUM_WORKERS,
+            pin_memory=PIN_MEMORY,
+            persistent_workers=NUM_WORKERS > 0,
+            prefetch_factor=4 if NUM_WORKERS > 0 else None,
+        )
 
-    dataset = MarketDataset(df)
-    train_ds, val_ds, test_ds, = chronological_split(dataset)
+        log.info(f"{split:5s}: {len(ds):,} samples")
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-    num_features = dataset.X_num.shape[-1]
-
-    return train_loader, val_loader, test_loader, num_features
+    return loaders["train"], loaders["val"], loaders["test"], num_features

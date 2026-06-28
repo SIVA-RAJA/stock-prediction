@@ -2,12 +2,12 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / "dataset"
+PARQUET_PATH = DATA_DIR / "market_data_full.parquet"
 HDF5_PATH = DATA_DIR / "market_data.hd5"
-PARQUET_DIR = DATA_DIR / "parquet"
 SCALER_DIR = DATA_DIR / "scalers"
 MMAP_DIR = DATA_DIR / "mmap"
 
-for d in [DATA_DIR, PARQUET_DIR, SCALER_DIR, MMAP_DIR]:
+for d in [DATA_DIR, SCALER_DIR, MMAP_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 CONFIGS = {
