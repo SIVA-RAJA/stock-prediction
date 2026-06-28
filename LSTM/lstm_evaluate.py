@@ -35,7 +35,7 @@ def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np
     inv = scaler.inverse_transform(dummy)
     return inv[:, close_idx]
 
-def evaluate(model: nn.Module, test_loader: DataLoader, ticker: str="Unknown", interval: str="1d", run_name: str="eval", ) -> dict:
+def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) -> dict:
     model.eval()
     model.to(DEVICE)
 
@@ -62,12 +62,12 @@ def evaluate(model: nn.Module, test_loader: DataLoader, ticker: str="Unknown", i
     dir_true = np.concatenate(all_dir_true)
     attn_all = np.concatenate(all_attn)
 
-    price_pred_real = _inverse_close(price_pred_sc, ticker, interval)
-    price_true_real = _inverse_close(price_true_sc, ticker, interval)
+    #price_pred_real = _inverse_close(price_pred_sc, ticker, interval)
+    #price_true_real = _inverse_close(price_true_sc, ticker, interval)
 
-    mae = np.mean(np.abs(price_pred_real - price_true_real))
-    rmse = np.sqrt(np.mean((price_pred_real - price_true_real) ** 2))
-    mape = np.mean(np.abs((price_pred_real - price_true_real) / np.where(price_true_real == 0, 1e-8, price_true_real))) * 100
+    mae = np.mean(np.abs(price_pred_sc - price_true_sc))
+    rmse = np.sqrt(np.mean((price_pred_sc - price_true_sc) ** 2))
+    mape = np.mean(np.abs((price_pred_sc - price_true_sc) / np.where(price_true_sc == 0, 1e-8, price_true_sc))) * 100
 
     dir_binary = (dir_pred_raw >= 0.5).astype(int)
     dir_true_i = dir_true.astype(int)
@@ -76,20 +76,20 @@ def evaluate(model: nn.Module, test_loader: DataLoader, ticker: str="Unknown", i
     precision = precision_score(dir_true_i, dir_binary, zero_division=0)
     recall = recall_score(dir_true_i, dir_binary, zero_division=0)
 
-    returns = np.diff(price_true_real)
+    returns = np.diff(price_true_sc)
     signals = dir_binary[:-1] * 2 - 1
     strat_ret = signals * returns
     sharpe_proxy = (strat_ret.mean() / (strat_ret.std() + 1e-8) * np.sqrt(252))
 
     metrices = {
-        "MAE": round(float(mae)),
-        "RMSE": round(float(rmse)),
-        "MAPE_%": round(float(mape)),
-        "Dir_Accuracy": round(float(dir_acc)),
-        "F1": round(float(f1)),
-        "Precision": round(float(precision)),
-        "Recall": round(float(recall)),
-        "Sharpe_proxy": round(float(sharpe_proxy)),
+        "MAE": round(float(mae), 4),
+        "RMSE": round(float(rmse), 4),
+        "MAPE_%": round(float(mape), 4),
+        "Dir_Accuracy": round(float(dir_acc), 4),
+        "F1": round(float(f1), 4),
+        "Precision": round(float(precision), 4),
+        "Recall": round(float(recall), 4),
+        "Sharpe_proxy": round(float(sharpe_proxy), 4),
     }
 
     log.info("\n ----- Evaluation Results ---------------------------")
@@ -98,22 +98,22 @@ def evaluate(model: nn.Module, test_loader: DataLoader, ticker: str="Unknown", i
     log.info(classification_report(dir_true_i, dir_binary, target_names=["DOWN", "UP"], zero_division=0))
 
     pred_df = pd.DataFrame({
-        "true_price": price_true_real,
-        "pred_price": price_pred_real,
+        "true_price": price_true_sc,
+        "pred_price": price_pred_sc,
         "true_dir": dir_true_i,
         "pred_dir": dir_binary,
         "dir_prob": dir_pred_raw,
     })
 
-    csv_path = RESULTS_DIR / f"{run_name}"
+    csv_path = RESULTS_DIR / f"{run_name}_predictions.csv"
     pred_df.to_csv(csv_path, index=False)
     log.info(f"Predictions saved -> {csv_path}")
 
     fig, axes = plt.subplots(2, 1, figsize=(14,8))
 
-    axes[0].plot(price_true_real, label="True Price", alpha=0.8, linewidth=1.2)
-    axes[0].plot(price_pred_real, label="Pred Price", alpha=0.8, linewidth=1.0, linestyle="--")
-    axes[0].set_title(f"{ticker} @ {interval} - Price Prediction (Test Set)")
+    axes[0].plot(price_true_sc, label="True Price", alpha=0.8, linewidth=1.2)
+    axes[0].plot(price_pred_sc, label="Pred Price", alpha=0.8, linewidth=1.0, linestyle="--")
+    axes[0].set_title(f"Price Prediction (Test Set)")
     axes[0].set_ylabel("Price")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
