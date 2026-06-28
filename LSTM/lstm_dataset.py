@@ -155,7 +155,7 @@ class MarketDataset(Dataset):
 def make_dataloaders(force_rebuild: bool = False):
 
     df = _load_parquet()
-    num_features = None
+    num_features: int | None = None
     loaders = {}
 
     for split in ("train", "val", "test"):
@@ -175,5 +175,7 @@ def make_dataloaders(force_rebuild: bool = False):
         )
 
         log.info(f"{split:5s}: {len(ds):,} samples")
+
+    assert num_features is not None, "No splits were processed; num_features was never set"
 
     return loaders["train"], loaders["val"], loaders["test"], num_features

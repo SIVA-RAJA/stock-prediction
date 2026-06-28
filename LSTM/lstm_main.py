@@ -1,15 +1,12 @@
 import argparse
 import logging
-from data.config import TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID
-from lstm_config import BEST_CKPT
+from data.config import TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID
+from lstm_config import DEVICE, BEST_CKPT
 from lstm_dataset import make_dataloaders
 from lstm_model import MarketLSTM
 from lstm_trainer import train, load_checkpoint
 from lstm_evaluate import evaluate
 from lstm_export import export_onnx, verify_onnx
-
-import sys
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent))
 
 
 logging.basicConfig(
@@ -20,34 +17,30 @@ logging.basicConfig(
 
 log = logging.getLogger(__name__)
 
-def build_model(num_features: int) -> MarketLSTM:
-    return MarketLSTM(
-        num_features=num_features,
-        num_tickers=len(TICKER_TO_ID),
-        num_markets=len(MARKET_TO_ID),
-        num_regions=len(REGION_TO_ID),
-    )
 
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--market", type=str, default=None)
-    parser.add_argument("--inteval", type=str, default="1d")
-    parser.add_argument("--region", type=str, default=None)
     parser.add_argument("--eval-only", action="store_true")
     parser.add_argument("--export", action="store_true")
+    parser.add_argument("--rebuild", action="store_true", help="Force rebuild mmap cache")
     args = parser.parse_args()
 
-    run_name = f"{args.market or 'ALL'}_{args.interval}_{args.region or 'ALL'}"
 
-    log.info(f"Loading data for: {run_name}")
-    train_loader, val_loader, test_loader, num_features = make_dataloaders(
-        market=args.market,
-        interval=args.interval,
-        region=args.region,
+    log.info(f"Loading data")
+    train_loader, val_loader, test_loader, num_features = make_dataloaders(force_rebuild=args.rebuild)
+    model = MarketLSTM(
+        num_features=num_features,
+        num_tickers=len(TICKER_TO_ID),
+        num_markets=len(MARKET_TO_ID),
+        num_regions=len(REGION_TO_ID),
+        num_intervals=len(INTERVAL_TO_ID),
     )
-    model = build_model(num_features)
-    log.info(f"Model built: {sum(p.numel() for p in model.parameters()):,} parameters")
+
+    log.info(f"Parameters: {sum(p.numel() for p in model.parameters()):,} | Trainable: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+    log.info(f"Device: {DEVICE}")
+    log.info(f"Features: {num_features}")
+    log.info(f"Tickers: {len(TICKER_TO_ID)}| Intervals: {len(INTERVAL_TO_ID)}")
 
     if args.eval_only:
         if not BEST_CKPT.exists():
@@ -56,14 +49,12 @@ def main():
         log.info("Loaded best checkpoint for evaluation")
     else:
         log.info("Starting training...")
-        model = train(model, train_loader, val_loader, run_name=run_name)
+        model = train(model, train_loader, val_loader, run_name="run")
 
-    log.info("Evaluating on testm set...")
+    log.info("Evaluating on test set...")
     metrices = evaluate(
         model, test_loader,
-        ticker=args.market or 'ALL',
-        interval=args.interval,
-        run_name=run_name,
+        run_name="eval",
     )
 
     if args.export:
