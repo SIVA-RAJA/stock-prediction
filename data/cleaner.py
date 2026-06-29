@@ -89,7 +89,7 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
     else:
         df["volume"] = df["volume"].clip(lower=0.0)
 
-    df = df.ffill(limit=3)
+    df = df.ffill(limit=5).bfill(limit=2)
     n_nan = df.isna().any(axis=1).sum()
     if n_nan:
         log.debug(f"{ticker} @ {interval}: dropping {n_nan} rows with NaN values after ffill")

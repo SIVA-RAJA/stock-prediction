@@ -139,7 +139,11 @@ def add_featurers(
         return None
 
     df = df.copy()
+    n = len(df)
     open, high, low, close, volume = df['open'], df['high'], df['low'], df['close'], df['volume']
+
+    def w(period):
+        return min(period, max(2, n // 2))
 
     df['ticker_id'] = TICKER_TO_ID.get(ticker, 0)
     df['market_id'] = MARKET_TO_ID.get(market, 0)
@@ -151,53 +155,91 @@ def add_featurers(
     df["sin_hour"], df["cos_hour"] = _sin_cos(pd.Series(idx.hour, index=idx), 24)
     df["sin_day_of_week"], df["cos_day_of_week"] = _sin_cos(pd.Series(idx.dayofweek, index=idx), 7)
     df["sin_day_of_month"], df["cos_day_of_month"] = _sin_cos(pd.Series(idx.day, index=idx), 31)
+    df["sin_week_of_year"], df["cos_week_of_year"] = _sin_cos(pd.Series(idx.isocalendar().week.values, index=idx), 52)
     df["sin_month"], df["cos_month"] = _sin_cos(pd.Series(idx.month, index=idx), 12)
+    df["sin_quarter"], df["cos_quarter"] = _sin_cos(pd.Series(idx.quarter, index=idx), 4)
 
     df["log_return"] = np.log(close / close.shift(1))
     df["pct_change"] = close.pct_change()
     df["hl_range"] = high - low
     df["co_range"] = close - open
 
-    for w in SMA_WINDOWS:
-        df[f"sma_{w}"] = close.rolling(window=w).mean()
+    for period in SMA_WINDOWS:
+        aw = w(period)
+        col = f"sma_{period}"
+        df[col] = close.rolling(aw).mean()
+        df[col] = df[col].fillna(close.expanding().mean())
 
-    for w in EMA_WINDOWS:
-        df[f"ema_{w}"] = close.ewm(span=w, min_periods=w).mean()
+    for period in EMA_WINDOWS:
+        aw = w(period)
+        col = f"ema_{period}"
+        df[col] = close.ewm(span=aw, min_periods=aw).mean()
+        df[col] = df[col].fillna(close.expanding().mean())
 
-    df["macd"], df["macd_signal"], df["macd_hist"] = _macd(close, MACD_FAST, MACD_SLOW, MACD_SIGNAL)
+    fast = w(MACD_FAST)
+    slow = w(MACD_SLOW)
+    signal = w(MACD_SIGNAL)
+    df["macd"], df["macd_signal"], df["macd_hist"] = _macd(close, fast, slow, signal)
+    df["macd"] = df["macd"].fillna(0)
+    df["macd_signal"] = df["macd_signal"].fillna(0.0)
+    df["macd_hist"] = df["macd_hist"].fillna(0.0)
 
-    df[f"rsi_{RSI_PERIOD}"] = _rsi(close, period=RSI_PERIOD)
+    df[f"rsi_{RSI_PERIOD}"] = _rsi(close, w(RSI_PERIOD))
+    df[f"rsi_{RSI_PERIOD}"] = df[f"rsi_{RSI_PERIOD}"].fillna(50.0)
 
-    df["stoch_k"], df["stoch_d"] = _stochastic(high, low, close, STOCH_WINDOW, STOCH_SMOOTH)
+    df["stoch_k"], df["stoch_d"] = _stochastic(high, low, close, w(STOCH_WINDOW), w(STOCH_SMOOTH))
+    df["stoch_k"] = df["stoch_k"].fillna(50.0)
+    df["stoch_d"] = df["stoch_d"].fillna(50.0)
 
-    df["williams_r"] = _williams_r(high, low, close, WILLIAMS_R_PERIOD)
+    df["williams_r"] = _williams_r(high, low, close, w(WILLIAMS_R_PERIOD))
+    df["williams_r"] = df["williams_r"].fillna(-50.0)
 
-    df[f"roc_{ROC_PERIOD}"] = close.pct_change(ROC_PERIOD) * 100
+    df[f"roc_{ROC_PERIOD}"] = close.pct_change(w(ROC_PERIOD)) * 100
+    df[f"roc_{ROC_PERIOD}"] = df[f"roc_{ROC_PERIOD}"].fillna(0.0)
 
-    df["bb_upper"], df["bb_mid"], df["bb_lower"], df["bb_width"], df["bb_pct"] = _bollinger(close, BB_WINDOW, BB_STD)
+    df["bb_upper"], df["bb_mid"], df["bb_lower"], df["bb_width"], df["bb_pct"] = _bollinger(close, w(BB_WINDOW), BB_STD)
+    df["bb_upper"] = df["bb_upper"].fillna(close)
+    df["bb_mid"] = df["bb_mid"].fillna(close)
+    df["bb_lower"] = df["bb_lower"].fillna(close)
+    df["bb_width"] = df["bb_width"].fillna(0.0)
+    df["bb_pct"] = df["bb_pct"].fillna(0.5)
 
-    df[f"atr_{ATR_PERIOD}"] = _atr(high, low, close, ATR_PERIOD)
+    df[f"atr_{ATR_PERIOD}"] = _atr(high, low, close, w(ATR_PERIOD))
+    df[f"atr_{ATR_PERIOD}"] = df[f"atr_{ATR_PERIOD}"].fillna((high - low).mean())
 
-    df[f"cci_{CCI_PERIOD}"] = _cci(high, low, close, CCI_PERIOD)
+    df[f"cci_{CCI_PERIOD}"] = _cci(high, low, close, w(CCI_PERIOD))
+    df[f"cci_{CCI_PERIOD}"] = df[f"cci_{CCI_PERIOD}"].fillna(0.0)
 
     df["obv"] = _obv(close, volume)
+    df["obv"] = df["obv"].fillna(0.0)
 
-    df["vwap"] = _vwap_rolling(high, low, close, volume, VWAP_PERIOD)
+    df["vwap"] = _vwap_rolling(high, low, close, volume, w(VWAP_PERIOD))
+    df["vwap"] = df["vwap"].fillna((high + low + close) / 3)
 
     if market not in ("FOREX", "INDICES"):
-        df[f"mfi_{MFI_PERIOD}"] = _mfi(high, low, close, volume, MFI_PERIOD)
+        df[f"mfi_{MFI_PERIOD}"] = _mfi(high, low, close, volume, w(MFI_PERIOD))
+        df[f"cmf_{CMF_PERIOD}"] = _cmf(high, low, close, volume, w(CMF_PERIOD))
     else:
-        df[f"mfi_{MFI_PERIOD}"] = np.nan
+        df[f"mfi_{MFI_PERIOD}"] = 0.0
+        df[f"cmf_{CMF_PERIOD}"] = 0.0
 
-    df[f"cmf_{CMF_PERIOD}"] = _cmf(high, low, close, volume, CMF_PERIOD)
+    df[f"mfi_{MFI_PERIOD}"] = df[f"mfi_{MFI_PERIOD}"].fillna(50.0)
+    df[f"cmf_{CMF_PERIOD}"] = df[f"cmf_{CMF_PERIOD}"].fillna(0.0)
 
-    df["volume_zscore"] = _volume_zscore(volume, window=20)
+
+    df["volume_zscore"] = _volume_zscore(volume, w(20))
+    df["volume_zscore"] = df["volume_zscore"].fillna(0.0)
 
     for lag in LAG_WINDOWS:
-        df[f"close_lag_{lag}"] = close.shift(lag)
-        df[f"return_lag_{lag}"] = df["log_return"].shift(lag)
 
-    df["market_regime"] = _market_regime(close, window=MARKET_REGIME_WINDOW)
+        if lag >= n:
+            df[f"close_lag_{lag}"] = close
+            df[f"return_lag_{lag}"] = 0.0
+        else:
+            df[f"close_lag_{lag}"] = close.shift(lag).fillna(close)
+            df[f"return_lag_{lag}"] = df["log_return"].shift(lag).fillna(0.0)
+
+    df["market_regime"] = _market_regime(close, window=w(MARKET_REGIME_WINDOW))
 
     df = _window_normalize(df)
 
@@ -205,6 +247,7 @@ def add_featurers(
     volume_derived = ["vwap", f"mfi_{MFI_PERIOD}", f"cmf_{CMF_PERIOD}", "volume_zscore"]
     if market in ("FOREX", "INDICES"):
         df[volume_derived] = df[volume_derived].fillna(0)
+    df = df.ffill().bfill()
     df.dropna(inplace=True)
     n_after = len(df)
     log.debug(f"Feature warm-up dropped {n_before - n_after} rows -> {n_after} rows remaining")
@@ -212,7 +255,7 @@ def add_featurers(
     if n_after < MIN_ROWS:
         log.warning(f"{ticker} @ {market}: only {n_after} rows after feature warm-up (< {MIN_ROWS})")
         return None
-
+    log.debug(f"{ticker} @ {interval}: {len(df)} rows")
     return df
 
 def add_features_all(cleaned: dict) -> dict:
