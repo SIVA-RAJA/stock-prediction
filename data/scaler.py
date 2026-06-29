@@ -4,7 +4,7 @@ import pandas as pd
 from sklearn.preprocessing import RobustScaler
 from pathlib import Path
 
-from config import SCALER_DIR
+from .config import SCALER_DIR
 
 log = logging.getLogger(__name__)
 

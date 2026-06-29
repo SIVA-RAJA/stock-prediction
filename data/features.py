@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 import numpy as np
 
-from config import *
+from .config import *
 
 log = logging.getLogger(__name__)
 
@@ -111,8 +111,11 @@ def _volume_zscore(volume, window=20):
     z_score = (volume - mean) / std.replace(0, np.nan)
     return z_score
 
-def _window_normalize(df):
-    base = df["close"].iloc[0]
+def _window_normalize(df, window=20):
+    base = df["close"].rolling(window=window, min_periods=1).mean().shift(1)
+    base = base.fillna(df["close"].iloc[0])
+    base = base.replace(0, np.nan).ffill().bfill().fillna(1.0)
+
     if base == 0 or np.isnan(base):
         base = 1.0
     price_cols = ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap"] + [f"sma_{w}" for w in SMA_WINDOWS] + [f"ema_{w}" for w in EMA_WINDOWS] + [f"close_lag_{lag}" for lag in LAG_WINDOWS]
@@ -241,7 +244,7 @@ def add_featurers(
 
     df["market_regime"] = _market_regime(close, window=w(MARKET_REGIME_WINDOW))
 
-    df = _window_normalize(df)
+    df = _window_normalize(df, window=w(200))
 
     n_before = len(df)
     volume_derived = ["vwap", f"mfi_{MFI_PERIOD}", f"cmf_{CMF_PERIOD}", "volume_zscore"]

@@ -19,12 +19,12 @@ sys.path.insert(0, str(_ROOT / "data"))
 import argparse
 import logging
 from data.config import TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID
-from lstm_config import DEVICE, BEST_CKPT
-from lstm_dataset import make_dataloaders
-from lstm_model import MarketLSTM
-from lstm_trainer import train, load_checkpoint
-from lstm_evaluate import evaluate
-from lstm_export import export_onnx, verify_onnx
+from .lstm_config import DEVICE, BEST_CKPT
+from .lstm_dataset import make_dataloaders
+from .lstm_model import MarketLSTM
+from .lstm_trainer import train, load_checkpoint
+from .lstm_evaluate import evaluate
+from .lstm_export import export_onnx, verify_onnx
 
 
 logging.basicConfig(

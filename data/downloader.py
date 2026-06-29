@@ -6,7 +6,7 @@ import yfinance as yf
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests
 
-from config import TICKERS, CONFIGS
+from .config import TICKERS, CONFIGS
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S")

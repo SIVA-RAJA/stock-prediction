@@ -1,11 +1,11 @@
-from pathlib import Path
 import torch
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-SCALER_DIR = DATA_DIR / "scalers"
-CHECKPOINT_DIR = BASE_DIR / "checkpoints"
-LOG_DIR = BASE_DIR / "runs"
+from data.config import DRIVE_ROOT, DATA_DIR
+
+
+BASE_DIR = DRIVE_ROOT
+CHECKPOINT_DIR = DRIVE_ROOT / "checkpoints"
+LOG_DIR = DRIVE_ROOT / "runs"
 MMAP_DIR = DATA_DIR / "mmap"
 
 for d in [CHECKPOINT_DIR, LOG_DIR, MMAP_DIR]:

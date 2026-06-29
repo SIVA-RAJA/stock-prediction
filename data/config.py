@@ -1,7 +1,8 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "dataset"
+DRIVE_ROOT = Path("/content/drive/MyDrive/Stock Predictor")
+BASE_DIR = DRIVE_ROOT
+DATA_DIR = DRIVE_ROOT / "dataset"
 PARQUET_PATH = DATA_DIR / "market_data_full.parquet"
 HDF5_PATH = DATA_DIR / "market_data.hd5"
 SCALER_DIR = DATA_DIR / "scalers"
@@ -16,7 +17,6 @@ CONFIGS = {
     "5m":  ("60d",  "5m"),
     "15m": ("60d",  "15m"),
     "30m": ("60d",  "30m"),
-    "60m": ("60d",  "60m"),
     "90m": ("60d",  "90m"),
     "1h":  ("730d", "1h"),
     "4h":  ("730d", "4h"),
@@ -41,8 +41,8 @@ TICKERS = {
         "CANADA": ["SHOP.TO","RY.TO","TD.TO","ENB.TO","BNS.TO","CNQ.TO","CP.TO","TRI.TO","BMO.TO","SU.TO"],
         "AUSTRALIA": ["CBA.AX","BHP.AX","CSL.AX","WBC.AX","NAB.AX","ANZ.AX","MQG.AX","WES.AX","GMG.AX","RIO.AX"],
         "KOREA": ["005930.KS","000660.KS","035420.KS","005380.KS","035720.KS","051910.KS","006400.KS","028260.KS","012330.KS","068270.KS"],
-        "SINGAPORE": ["D05.SI","O39.SI","U11.SI","Z74.SI","C6L.SI","S68.SI","BN4.SI","F34.SI","G13.SI","U96.SI"],
-        "BRAZIL": ["PETR4.SA","VALE3.SA","ITUB4.SA","BBDC4.SA","ABEV3.SA","BBAS3.SA","WEGE3.SA","B3SA3.SA","RENT3.SA","JBSS3.SA"],
+        "SINGAPORE": ["D05.SI","AJBU.SI","U11.SI","Z74.SI","C6L.SI","S68.SI","BN4.SI","F34.SI","G13.SI","U96.SI"],
+        "BRAZIL": ["PETR4.SA","VALE3.SA","ITUB4.SA","BBDC4.SA","ABEV3.SA","BBAS3.SA","WEGE3.SA","B3SA3.SA","RENT3.SA","SUZB3.SA"],
     },
     "CRYPTO" : {
         "CRYPTO": ["BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD","ADA-USD","DOGE-USD","TRX-USD","AVAX-USD","LINK-USD"],

@@ -3,7 +3,7 @@ import pandas as pd
 import re
 from typing import cast, Any
 
-from config import HDF5_PATH
+from .config import HDF5_PATH
 
 log = logging.getLogger(__name__)
 

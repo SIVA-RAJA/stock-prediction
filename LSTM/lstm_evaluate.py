@@ -9,7 +9,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
-from lstm_config import DEVICE, CHECKPOINT_DIR
+from .lstm_config import DEVICE, CHECKPOINT_DIR
+from data.config import TICKER_TO_ID, INTERVAL_TO_ID
 from data.scaler import load_scaler
 
 
@@ -17,11 +18,15 @@ log = logging.getLogger(__name__)
 RESULTS_DIR = CHECKPOINT_DIR / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
+
+ID_TO_TICKER = {v: k for k, v in TICKER_TO_ID.items()}
+ID_TO_INTERVAL = {v: k for k, v in INTERVAL_TO_ID.items()}
+
 def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np.ndarray:
 
     bundle = load_scaler(ticker, interval)
     if bundle is None:
-        log.warning(f"No scalar for {ticker} @ {interval} - returning scaled values")
+        log.warning(f"No scaler for {ticker} @ {interval} - returning scaled values")
         return scaled_values
 
     scaler, cols = bundle
@@ -35,6 +40,27 @@ def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np
     inv = scaler.inverse_transform(dummy)
     return inv[:, close_idx]
 
+def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interval_ids: np.ndarray) -> np.ndarray:
+
+    out = np.empty_like(scaled_values, dtype=np.float64)
+    pairs = np.stack([ticker_ids, interval_ids], axis=1)
+    unique_pairs = np.unique(pairs, axis=0)
+
+    for ticker_id, interval_id in unique_pairs:
+        ticker = ID_TO_TICKER.get(int(ticker_id))
+        interval = ID_TO_INTERVAL.get(int(interval_id))
+        mask = (ticker_ids == ticker_id) & (interval_ids == interval_id)
+
+        if ticker is None or interval is None:
+            log.warning(f"Unknown ticker_id={ticker_id}/interval_id={interval_id}; leaving {mask.sum()} samples scaled")
+            out[mask] = scaled_values[mask]
+            continue
+
+        out[mask] = _inverse_close(scaled_values[mask], ticker, interval)
+
+    return out
+
+
 def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) -> dict:
     model.eval()
     model.to(DEVICE)
@@ -42,6 +68,7 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     all_price_pred, all_price_true = [], []
     all_dir_pred, all_dir_true = [], []
     all_attn = []
+    all_emb = []
 
     with torch.no_grad():
         for x_num, x_emb, y_price, y_dir in test_loader:
@@ -57,15 +84,19 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
             all_dir_pred.append(dir_pred.squeeze().cpu().numpy())
             all_dir_true.append(y_dir.numpy())
             all_attn.append(attn.cpu().numpy())
+            all_emb.append(x_emb.cpu().numpy())
 
     price_pred_sc = np.concatenate(all_price_pred)
     price_true_sc = np.concatenate(all_price_true)
     dir_pred_raw = np.concatenate(all_dir_pred)
     dir_true = np.concatenate(all_dir_true)
     attn_all = np.concatenate(all_attn)
+    emb_all = np.concatenate(all_emb)
+    ticker_ids, interval_ids = emb_all[:, 0], emb_all[:, 3]
 
-    #price_pred_real = _inverse_close(price_pred_sc, ticker, interval)
-    #price_true_real = _inverse_close(price_true_sc, ticker, interval)
+    log.info("Inverse-scaling predictions per ticker before computing metrics...")
+    price_pred_sc = _inverse_close_all(price_pred_sc, ticker_ids, interval_ids)
+    price_true_sc = _inverse_close_all(price_true_sc, ticker_ids, interval_ids)
 
     mae = np.mean(np.abs(price_pred_sc - price_true_sc))
     rmse = np.sqrt(np.mean((price_pred_sc - price_true_sc) ** 2))

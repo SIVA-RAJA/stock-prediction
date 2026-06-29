@@ -10,13 +10,13 @@ import logging
 import pickle
 import time
 
-from config import DATA_DIR
-from downloader import download_all
-from cleaner import clean_all
-from hdf5_writer import write_hdf5
-from features import add_features_all
-from scaler import scale_all
-from parquet_writer import write_parquet
+from .config import DATA_DIR
+from .downloader import download_all
+from .cleaner import clean_all
+from .hdf5_writer import write_hdf5
+from .features import add_features_all
+from .scaler import scale_all
+from .parquet_writer import write_parquet
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S", )

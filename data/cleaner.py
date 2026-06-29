@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
 
-from config import MIN_ROWS
+from .config import MIN_ROWS
 
 log = logging.getLogger(__name__)
 

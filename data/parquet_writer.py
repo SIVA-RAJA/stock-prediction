@@ -3,7 +3,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from config import PARQUET_PATH
+from .config import PARQUET_PATH
 
 log = logging.getLogger(__name__)
 

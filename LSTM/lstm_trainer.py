@@ -91,6 +91,8 @@ def _run_epoch(
             price_loss_sum += lp.item()
             dir_loss_sum += ld.item()
 
+            dir_pred = torch.sigmoid(dir_pred)
+
             all_price_pred.append(price_pred.squeeze().detach().cpu().numpy())
             all_price_true.append(y_price.detach().cpu().numpy())
             all_dir_pred.append(dir_pred.squeeze().detach().cpu().numpy())
@@ -163,7 +165,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer, T_0=SCHEDULER_TO, T_mult=SCHEDULER_T_MULT
     )
-    scaler_amp = torch.amp.GradScaler("cuda", enabled=USE_AMP)
+    scaler_amp = torch.amp.GradScaler(DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
     best_val_loss = float("inf")
@@ -176,11 +178,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
 
-        if ckpt.get("scaler") and USE_AMP:
-            scaler_amp.load_state_dict(ckpt["scaler"])
+        if ckpt.get("scaler_amp") and USE_AMP:
+            scaler_amp.load_state_dict(ckpt["scaler_amp"])
         start_epoch = ckpt["epoch"] + 1
-        best = ckpt.get("best_val_loss", float("inf"))
-        early_stop.best_loss = best
+        best_val_loss = ckpt.get("best_val_loss", float("inf"))
+        early_stop.best_loss = best_val_loss
 
     for epoch in range(start_epoch, NUM_EPOCHS + 1):
 
