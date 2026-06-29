@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -18,6 +17,30 @@ EMB_COLS = ["ticker_id", "market_id", "region_id", "interval_id"]
 
 EXCLUDE_COLS = EMB_COLS + ["datetime", "ticker", "market", "region", "interval"]
 
+def _count_windows(n_rows, split):
+    n_tr = int(n_rows * TRAIN_FRAC)
+    n_val = int(n_rows * VAL_FRAC)
+
+    if split == "train":
+        n = n_tr
+    elif split == "val":
+        n = n_val
+    else:
+        n = n_rows - n_tr - n_val
+
+    usable = n - SEQ_LEN - PRED_HORIZON + 1
+    if usable <= 0:
+        return 0
+    return max(0, (usable + STRIDE - 1) // STRIDE)
+
+def _scan_parquet():
+    log.info(f"Scanning parquet for group sizes...")
+    table = pq.read_table(str(PARQUET_PATH), columns=["ticker", "interval"])
+    df = table.to_pandas()
+    sizes = df.groupby(["ticker", "interval"]).size().reset_index(name="n_rows")
+    log.info(f"Found {len(sizes):,} ticker/interval groups")
+    return sizes
+
 def _load_parquet() -> pd.DataFrame:
 
     table = pq.read_table(str(PARQUET_PATH))
@@ -28,7 +51,7 @@ def _load_parquet() -> pd.DataFrame:
     log.info(f"Loaded {len(df):,} rows | {df['ticker'].nunique():,} tickers | {df['interval'].nunique():,} intervals")
     return df
 
-def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
+def _build_mmap(split: str, force_rebuild: bool = False):
 
     outdir = Path(MMAP_DIR) / split
     outdir.mkdir(parents=True, exist_ok=True)
@@ -52,38 +75,15 @@ def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
         log.info(f"[{split}] {N:,} windows | {F} features")
         return X_num, X_emb, y_price, y_dir, F
 
-    log.info(f"Building mmap [{split}] from {len(df):,} rows ...")
+    sizes = _scan_parquet()
 
-    num_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
+    first_group = pq.read_table(str(PARQUET_PATH), filters=[("ticker", "=", sizes.iloc[0]["ticker"]), ("interval", "=", sizes.iloc[0]["interval"])]).to_pandas()
+    num_cols = [c for c in first_group.columns if c not in EXCLUDE_COLS]
     num_features = len(num_cols)
     close_idx = num_cols.index("close")
+    del first_group
 
-    total_windows = 0
-    groups = []
-
-    for (ticker, interval), group in df.groupby(["ticker", "interval"], sort=False):
-        group = group.sort_values("datetime").reset_index(drop=True)
-        n = len(group)
-        n_tr = int(n * TRAIN_FRAC)
-        n_val = int(n * VAL_FRAC)
-
-        if split == "train":
-            g = group.iloc[:n_tr]
-        elif split == "val":
-            g = group.iloc[n_tr:n_tr+n_val]
-        else:
-            g = group.iloc[n_tr+n_val:]
-
-        usable = len(g) - SEQ_LEN - PRED_HORIZON + 1
-        if usable <= 0:
-            continue
-
-        n_windows = (usable + STRIDE - 1) // STRIDE
-        groups.append((ticker, interval, g, n_windows))
-        total_windows += n_windows
-
-    if total_windows == 0:
-        raise ValueError(f"No windows could be built for split={split}.")
+    total_windows = sum(_count_windows(int(row["n_rows"]), split) for _, row in sizes.iterrows())
 
     size_gb = total_windows * SEQ_LEN * num_features * 4 / 1e9
     log.info(f"[{split}] Pre-allocating {total_windows:,} windows | {num_features} features | {size_gb:.2f} GB")
@@ -94,11 +94,46 @@ def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
     y_dir = np.lib.format.open_memmap(str(paths["y_dir"]), mode="w+", dtype=np.float32, shape=(total_windows, ))
 
     cursor = 0
-    for ticker, interval, g, _ in groups:
+    total_groups = len(sizes)
+
+    for i, (_, row) in enumerate(sizes.iterrows()):
+        ticker = row["ticker"]
+        interval = row["interval"]
+
+        if (i + 1) % 50 == 0 or i == 0:
+            log.info(f"[{split}] Processing group {i + 1:,}/{total_groups:,} | {ticker} @ {interval} | cursor={cursor:,}")
+
+        try:
+            chunk = pq.read_table(str(PARQUET_PATH), filters=[("ticker", "=", ticker), ("interval", "=", interval)]).to_pandas()
+        except Exception as e:
+            log.warning(f"[{split}] Failed to read {ticker} @ {interval}: {e}")
+            continue
+
+        if len(chunk) < SEQ_LEN + PRED_HORIZON + 5:
+            continue
+
+        chunk = chunk.sort_values("datetime").reset_index(drop=True)
+
+        n = len(chunk)
+        n_tr = int(n * TRAIN_FRAC)
+        n_val = int(n * VAL_FRAC)
+
+        if split == "train":
+            g = chunk.iloc[:n_tr]
+        elif split == "val":
+            g = chunk.iloc[n_tr:n_tr + n_val]
+        else:
+            g = chunk.iloc[n_tr + n_val:]
+
+        del chunk
+
+        if len(g) < SEQ_LEN + PRED_HORIZON:
+            continue
         vals = g[num_cols].values.astype(np.float32)
         emb = g[EMB_COLS].values.astype(np.int64)
-        row = 0
+        del g
 
+        row = 0
         while True:
             end = row + SEQ_LEN
             target = end + PRED_HORIZON - 1
@@ -106,13 +141,14 @@ def _build_mmap(df: pd.DataFrame, split: str, force_rebuild: bool = False):
                 break
 
             window = vals[row:end].copy()
-            
+
             X_num[cursor] = window
             X_emb[cursor] = emb[end - 1]
             y_price[cursor] = vals[target, close_idx]
             y_dir[cursor] = float(vals[target, close_idx] > vals[end - 1, close_idx])
             cursor += 1
             row += STRIDE
+        del vals, emb
 
     actual = cursor
     log.info(f"[{split}] Built {actual:,} windows")
@@ -151,12 +187,11 @@ class MarketDataset(Dataset):
 
 def make_dataloaders(force_rebuild: bool = False):
 
-    df = _load_parquet()
     num_features: int | None = None
     loaders = {}
 
     for split in ("train", "val", "test"):
-        X_num, X_emb, y_price, y_dir, nf = _build_mmap(df, split, force_rebuild=force_rebuild)
+        X_num, X_emb, y_price, y_dir, nf = _build_mmap(split, force_rebuild=force_rebuild)
         if num_features is None:
             num_features = nf
 

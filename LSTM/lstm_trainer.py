@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 
 from .lstm_config import (
     DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE,
-    MIN_DELTA, SCHEDULER_TO, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT, LOG_DIR, USE_AMP
+    MIN_DELTA, SCHEDULER_TO, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT,  RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
@@ -126,11 +126,12 @@ class EarlyStopping:
         return self.should_stop
 
 
-def _save_checkpoint(model, optimizer,scheduler, epoch,val_loss, scaler_amp, path):
+def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, path, best_val_loss=None):
 
     torch.save({
         "epoch": epoch,
         "val_loss": val_loss,
+        "best_val_loss": best_val_loss,
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
@@ -154,6 +155,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
     model.to(DEVICE)
     log.info(f"Training on {DEVICE}")
+    log.info(f"AMP : {USE_AMP}")
     log.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     criterion = MultiTaskLoss()
@@ -164,10 +166,23 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     scaler_amp = torch.amp.GradScaler("cuda", enabled=USE_AMP)
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
-
     best_val_loss = float("inf")
+    start_epoch = 1
 
-    for epoch in range(1, NUM_EPOCHS + 1):
+    if RESUME_CKPT.exists():
+        log.info(f"Resuming training from checkpoint {RESUME_CKPT.name}")
+        ckpt = torch.load(RESUME_CKPT, map_location=DEVICE)
+        model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
+
+        if ckpt.get("scaler") and USE_AMP:
+            scaler_amp.load_state_dict(ckpt["scaler"])
+        start_epoch = ckpt["epoch"] + 1
+        best = ckpt.get("best_val_loss", float("inf"))
+        early_stop.best_loss = best
+
+    for epoch in range(start_epoch, NUM_EPOCHS + 1):
 
         t0 = time.time()
         tr_loss, tr_lp, tr_ld, tr_m = _run_epoch(model, train_loader, criterion, optimizer, scaler_amp, is_train=True)
@@ -205,9 +220,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            _save_checkpoint(model, optimizer, scheduler, epoch, val_loss, scaler_amp, BEST_CKPT)
+            _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, BEST_CKPT, best_val_loss)
             log.info(f"New best model saved at epoch {epoch} with val_loss={val_loss:.6f}")
-        _save_checkpoint(model, optimizer, scheduler, epoch, val_loss, scaler_amp, LAST_CKPT)
+        _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, RESUME_CKPT, best_val_loss=None)
 
         if early_stop.step(val_loss):
             log.info(f"Early stopping triggered at epoch {epoch}")

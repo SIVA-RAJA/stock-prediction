@@ -67,3 +67,4 @@ USE_AMP = True
 
 BEST_CKPT = CHECKPOINT_DIR / "best_model.pt"
 LAST_CKPT = CHECKPOINT_DIR / "last_model.pt"
+RESUME_CKPT = CHECKPOINT_DIR / "resume.pt"
