@@ -70,7 +70,6 @@ class MarketLSTM(nn.Module):
         self.dropout = nn.Dropout(HEAD_DROPOUT)
         self.price_head = PredictionHead(lstm_out_dim, HEAD_HIDDEN, 1, HEAD_DROPOUT)
         self.dir_head = PredictionHead(lstm_out_dim, HEAD_HIDDEN, 1, HEAD_DROPOUT)
-        self.sigmoid = nn.Sigmoid()
         self._init_weights()
 
     def _init_weights(self):
@@ -105,6 +104,6 @@ class MarketLSTM(nn.Module):
         context = self.dropout(self.norm(context))
 
         price_pred = self.price_head(context)
-        dir_pred = self.sigmoid(self.dir_head(context))
+        dir_pred = self.dir_head(context)
 
         return price_pred, dir_pred, attn_weights

@@ -17,7 +17,7 @@ from pathlib import Path
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "data" / "dataset"
+DATA_DIR = ROOT / "data"
 LSTM_DIR = ROOT / "LSTM"
 
 for _p in(str(ROOT), str(DATA_DIR), str(LSTM_DIR)):

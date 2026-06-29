@@ -202,6 +202,9 @@ def add_featurers(
     df = _window_normalize(df)
 
     n_before = len(df)
+    volume_derived = ["vwap", f"mfi_{MFI_PERIOD}", f"cmf_{CMF_PERIOD}", "volume_zscore"]
+    if market in ("FOREX", "INDICES"):
+        df[volume_derived] = df[volume_derived].fillna(0)
     df.dropna(inplace=True)
     n_after = len(df)
     log.debug(f"Feature warm-up dropped {n_before - n_after} rows -> {n_after} rows remaining")
