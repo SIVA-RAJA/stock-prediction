@@ -109,8 +109,7 @@ def _build_mmap(df,  split: str, force_rebuild: bool = False) -> tuple:
             window = vals[row:end].copy()
             base = window[0, close_idx]
             if base !=0 and not np.isnan(base):
-                for idx in df.columns:        # indices of open/high/low/close/sma_*/ema_*/bb_*/vwap
-                    window[:, idx] /= base
+                window /= base
 
             X_num[cursor] = window
             X_emb[cursor] = emb[end - 1]
