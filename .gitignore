@@ -16,3 +16,8 @@ env
 
 .ruff_cache/
 .ruff*
+
+.dataset/*
+.runs/*
+.checkpoints/*
+
