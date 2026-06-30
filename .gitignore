@@ -13,3 +13,6 @@ env
 *.parquet
 *.joblib
 *.pkl
+
+.ruff_cache/
+.ruff*
