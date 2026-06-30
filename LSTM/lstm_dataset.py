@@ -69,11 +69,11 @@ def _build_mmap(df,  split: str, force_rebuild: bool = False) -> tuple:
         n_val = int(n * VAL_FRAC)
 
         if split == "train":
-            g = group.iloc[:n_tr]
+            g = g.iloc[:n_tr]
         elif split == "val":
-            g = group.iloc[n_tr:n_tr + n_val]
+            g = g.iloc[n_tr:n_tr + n_val]
         else:
-            g = group.iloc[n_tr + n_val:]
+            g = g.iloc[n_tr + n_val:]
 
         usable = len(g) - SEQ_LEN  - PRED_HORIZON + 1
         if usable <= 0:
@@ -95,7 +95,7 @@ def _build_mmap(df,  split: str, force_rebuild: bool = False) -> tuple:
     y_dir = np.lib.format.open_memmap(str(paths["y_dir"]), mode="w+", dtype=np.float32, shape=(total_windows, ))
 
     cursor = 0
-    for g, ticker, interval, g, _ in groups:
+    for ticker, interval, g, _ in groups:
         vals = g[num_cols].values.astype(np.float32)
         emb = g[EMB_COLS].values.astype(np.int64)
         row = 0

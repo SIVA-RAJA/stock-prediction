@@ -116,8 +116,6 @@ def _window_normalize(df, window=20):
     base = base.fillna(df["close"].iloc[0])
     base = base.replace(0, np.nan).ffill().bfill().fillna(1.0)
 
-    if base == 0 or np.isnan(base):
-        base = 1.0
     price_cols = ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap"] + [f"sma_{w}" for w in SMA_WINDOWS] + [f"ema_{w}" for w in EMA_WINDOWS] + [f"close_lag_{lag}" for lag in LAG_WINDOWS]
 
     for col in price_cols:

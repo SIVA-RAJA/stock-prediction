@@ -1,6 +1,7 @@
 import logging
 import joblib
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import RobustScaler
 from pathlib import Path
 
@@ -63,11 +64,22 @@ def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame 
         return None
 
     scaler, cols = scaler_data
+    cols = [str(c) for c in cols]
     df = df.copy()
     present = [col for col in cols if col in df.columns]
-    df[present] = scaler.inverse_transform(df[present])
-    return df
 
+    dummy = np.zeros((len(df), len(cols)))
+    for i, col in enumerate(cols):
+        if col in present:
+            dummy[:, i] = df[col].to_numpy()
+
+    inv = scaler.inverse_transform(dummy)
+
+    for i, col in enumerate(cols):
+        if col in present:
+            df.loc[:, col] = inv[:, i]
+
+    return df
 
 def scale_all(featured: dict) -> dict:
 
