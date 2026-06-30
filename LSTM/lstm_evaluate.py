@@ -79,9 +79,9 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
 
             dir_pred = torch.sigmoid(dir_pred)
 
-            all_price_pred.append(price_pred.squeeze().cpu().numpy())
+            all_price_pred.append(price_pred.squeeze(-1).cpu().numpy())
             all_price_true.append(y_price.numpy())
-            all_dir_pred.append(dir_pred.squeeze().cpu().numpy())
+            all_dir_pred.append(dir_pred.squeeze(-1).cpu().numpy())
             all_dir_true.append(y_dir.numpy())
             all_attn.append(attn.cpu().numpy())
             all_emb.append(x_emb.cpu().numpy())

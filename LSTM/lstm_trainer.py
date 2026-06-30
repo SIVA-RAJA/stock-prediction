@@ -25,8 +25,8 @@ class MultiTaskLoss(nn.Module):
 
     def forward(self, price_pred, price_true, dir_pred, dir_true) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
-        loss_price = self.mse(price_pred.squeeze(), price_true)
-        loss_dir = self.bce(dir_pred.squeeze(), dir_true)
+        loss_price = self.mse(price_pred.squeeze(-1), price_true)
+        loss_dir = self.bce(dir_pred.squeeze(-1), dir_true)
         total = self.lp * loss_price + self.ld * loss_dir
         return total, loss_price, loss_dir
 
@@ -93,9 +93,9 @@ def _run_epoch(
 
             dir_pred = torch.sigmoid(dir_pred)
 
-            all_price_pred.append(price_pred.squeeze().detach().cpu().numpy())
+            all_price_pred.append(price_pred.squeeze(-1).detach().cpu().numpy())
             all_price_true.append(y_price.detach().cpu().numpy())
-            all_dir_pred.append(dir_pred.squeeze().detach().cpu().numpy())
+            all_dir_pred.append(dir_pred.squeeze(-1).detach().cpu().numpy())
             all_dir_true.append(y_dir.detach().cpu().numpy())
 
     n = len(loader)
