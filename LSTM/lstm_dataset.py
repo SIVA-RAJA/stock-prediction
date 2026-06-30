@@ -58,6 +58,15 @@ def _build_mmap(df,  split: str, force_rebuild: bool = False) -> tuple:
     num_features = len(num_cols)
     close_idx = num_cols.index("close")
 
+    PRICE_COLS = (
+        ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap",
+        "macd", "macd_signal", "macd_hist", "atr_14", "hl_range", "co_range"]
+        + [c for c in num_cols if c.startswith("sma_")]
+        + [c for c in num_cols if c.startswith("ema_")]
+        + [c for c in num_cols if c.startswith("close_lag_")]
+    )
+    price_col_idxs = [num_cols.index(c) for c in PRICE_COLS if c in num_cols]
+
     total_windows = 0
     groups = []
 
@@ -109,7 +118,8 @@ def _build_mmap(df,  split: str, force_rebuild: bool = False) -> tuple:
             window = vals[row:end].copy()
             base = window[0, close_idx]
             if base !=0 and not np.isnan(base):
-                window /= base
+                for idx in price_col_idxs:
+                    window[:, idx] /= base
 
             X_num[cursor] = window
             X_emb[cursor] = emb[end - 1]
