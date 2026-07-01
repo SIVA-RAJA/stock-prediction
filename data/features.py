@@ -206,12 +206,14 @@ def add_featurers(
     df["bb_pct"] = df["bb_pct"].fillna(0.5)
 
     df[f"atr_{ATR_PERIOD}"] = _atr(high, low, close, w(ATR_PERIOD))
-    df[f"atr_{ATR_PERIOD}"] = df[f"atr_{ATR_PERIOD}"].fillna((high - low).mean())
+    df[f"atr_{ATR_PERIOD}"] = df[f"atr_{ATR_PERIOD}"].fillna((high - low).shift(1).expanding().mean())
 
     df[f"cci_{CCI_PERIOD}"] = _cci(high, low, close, w(CCI_PERIOD))
     df[f"cci_{CCI_PERIOD}"] = df[f"cci_{CCI_PERIOD}"].fillna(0.0)
 
     df["obv"] = _obv(close, volume)
+    roll = df["obv"].rolling(w(20), min_periods=1)
+    df["obv"] = (df["obv"] - roll.mean()) / roll.std().replace(0, np.nan)
     df["obv"] = df["obv"].fillna(0.0)
 
     df["vwap"] = _vwap_rolling(high, low, close, volume, w(VWAP_PERIOD))

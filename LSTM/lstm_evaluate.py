@@ -109,8 +109,9 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     precision = precision_score(dir_true_i, dir_binary, zero_division=0)
     recall = recall_score(dir_true_i, dir_binary, zero_division=0)
 
-    returns = np.diff(price_true_sc)
-    signals = dir_binary[:-1] * 2 - 1
+    same_group = (ticker_ids[1:] == ticker_ids[:-1]) & (interval_ids[1:] == interval_ids[:-1])
+    returns = np.diff(price_true_sc)[same_group]
+    signals = (dir_binary[:-1] * 2 - 1)[same_group]
     strat_ret = signals * returns
     sharpe_proxy = (strat_ret.mean() / (strat_ret.std() + 1e-8) * np.sqrt(252))
 

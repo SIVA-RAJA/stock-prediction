@@ -82,7 +82,6 @@ from data.downloader import download_all
 from data.cleaner import clean_all
 from data.hdf5_writer import write_hdf5
 from data.features import add_features_all
-from data.scaler import scale_all
 from data.parquet_writer import write_parquet
 
 from LSTM.lstm_config import DEVICE, BEST_CKPT
@@ -181,35 +180,30 @@ def run_data_pipeline(skip_download: bool) -> None:
         raw = _load_raw_cache()
     else:
         log.info("=" * 60)
-        log.info("Step 1/6: Downloading raw data...")
+        log.info("Step 1/5: Downloading raw data...")
         log.info("=" * 60)
         raw = download_all(batch_size=10, sleep_between_batches=1.5)
         _save_raw_cache(raw)
 
     log.info("=" * 60)
-    log.info("Step 2/6: Cleaning raw data...")
+    log.info("Step 2/5: Cleaning raw data...")
     log.info("=" * 60)
     cleaned = clean_all(raw)
 
     log.info("=" * 60)
-    log.info("Step 3/6: Writing cleaned data to HDF5...")
+    log.info("Step 3/5: Writing cleaned data to HDF5...")
     log.info("=" * 60)
     write_hdf5(cleaned)
 
     log.info("=" * 60)
-    log.info("Step 4/6: Adding features to cleaned data...")
+    log.info("Step 4/5: Adding features to cleaned data...")
     log.info("=" * 60)
     featured = add_features_all(cleaned)
 
     log.info("=" * 60)
-    log.info("Step 5/6: Scaling features...")
+    log.info("Step 5/5: Writing featured (unscaled) data to Parquet...")
     log.info("=" * 60)
-    scaled = scale_all(featured)
-
-    log.info("=" * 60)
-    log.info("Step 6/6: Writing scaled data to Parquet...")
-    log.info("=" * 60)
-    write_parquet(scaled)
+    write_parquet(featured)
 
     elapsed = time.time() - t0
     log.info("=" * 60)

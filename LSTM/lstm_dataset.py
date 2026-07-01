@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
-from pathlib import Path
+from data.scaler import fit_and_scale
 import torch
 from torch.utils.data import Dataset, DataLoader
 
@@ -28,39 +28,51 @@ def _load_parquet() -> pd.DataFrame:
     log.info(f"Loaded {len(df):,} rows | {df['ticker'].nunique():,} tickers | {df['interval'].nunique():,} intervals")
     return df
 
-def _build_groups(df,  split: str) -> tuple:
+def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
 
-    log.info(f"Building Groups...")
+    log.info("Building groups (fitting scaler on train split only, per ticker/interval)...")
 
     num_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
     close_idx = num_cols.index("close")
 
-    groups = []
+    groups = {"train": [], "val": [], "test": []}
 
     for (ticker, interval), group in df.groupby(["ticker", "interval"], sort=False):
 
+        ticker = str(ticker)
+        interval = str(interval)
+
         g = group.sort_values("datetime").reset_index(drop=True)
-        n = len(group)
+        n = len(g)
         n_tr = int(n * TRAIN_FRAC)
         n_val = int(n * VAL_FRAC)
 
-        if split == "train":
-            g = g.iloc[:n_tr]
-        elif split == "val":
-            g = g.iloc[n_tr:n_tr + n_val]
-        else:
-            g = g.iloc[n_tr + n_val:]
+        g_train = g.iloc[:n_tr].copy()
+        g_val = g.iloc[n_tr:n_tr + n_val].copy()
+        g_test = g.iloc[n_tr + n_val:].copy()
 
-        usable = len(g) - SEQ_LEN  - PRED_HORIZON + 1
-        if usable <= 0:
+        if len(g_train) - SEQ_LEN - PRED_HORIZON + 1 <= 0:
             continue
 
-        val = g[num_cols].values.astype(np.float32)
-        emb = g[EMB_COLS].values.astype(np.int64)
-        groups.append((val, emb))
+        g_train_scaled, scaler, scale_cols = fit_and_scale(g_train, ticker, interval, save=True)
+
+        splits = {"train": g_train_scaled}
+        for name, g_split in (("val", g_val), ("test", g_test)):
+            present = [c for c in scale_cols if c in g_split.columns]
+            if len(g_split) and present:
+                g_split[present] = scaler.transform(g_split[present])
+                g_split[present] = g_split[present].clip(-10, 10)
+            splits[name] = g_split
+
+        for name, g_split in splits.items():
+            usable = len(g_split) - SEQ_LEN - PRED_HORIZON + 1
+            if usable <= 0:
+                continue
+            val_arr = g_split[num_cols].values.astype(np.float32)
+            emb_arr = g_split[EMB_COLS].values.astype(np.int64)
+            groups[name].append((val_arr, emb_arr))
 
     return groups, num_cols, close_idx
-
 
 class MarketDataset(Dataset):
 
@@ -100,15 +112,12 @@ class MarketDataset(Dataset):
 def make_dataloaders(force_rebuild: bool = False):
 
     df = _load_parquet()
-    num_features: int | None = None
+    groups_by_split, num_cols, close_idx = _build_all_groups(df)
+    num_features = len(num_cols)
     loaders = {}
 
     for split in ("train", "val", "test"):
-        groups, num_clos, close_idx = _build_groups(df, split)
-        if num_features is None:
-            num_features = len(num_clos)
-
-        ds = MarketDataset(groups, close_idx)
+        ds = MarketDataset(groups_by_split[split], close_idx)
         loaders[split] = DataLoader(
             ds,
             batch_size=BATCH_SIZE,
@@ -118,9 +127,6 @@ def make_dataloaders(force_rebuild: bool = False):
             persistent_workers=NUM_WORKERS > 0,
             prefetch_factor=4 if NUM_WORKERS > 0 else None,
         )
-
         log.info(f"{split:5s}: {len(ds):,} samples")
-
-    assert num_features is not None, "No splits were processed; num_features was never set"
 
     return loaders["train"], loaders["val"], loaders["test"], num_features
