@@ -31,6 +31,8 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
 
     df = df.copy()
 
+    print(f"[DEBUG cleaner] {ticker}/{interval} IN: shape={df.shape} dtypes={dict(df.dtypes)}")             #DEBUG
+
     if not isinstance(df.index, pd.DatetimeIndex):
         try:
             df.index = pd.to_datetime(df.index, utc=True)
@@ -101,6 +103,8 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
         log.warning(f"{ticker} @ {interval}: only {len(df)} rows after cleaning(< {MIN_ROWS}), skipping")
         return None
     log.debug(f"{ticker} @ {interval}: {len(df)} rows after cleaning")
+
+    print(f"[DEBUG cleaner] {ticker}/{interval} OUT: shape={df.shape} nan_total={df.isna().sum().sum()} index_monotonic={df.index.is_monotonic_increasing}")      #DEBUG
 
     return df
 

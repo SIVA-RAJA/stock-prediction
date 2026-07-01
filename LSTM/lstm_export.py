@@ -13,6 +13,8 @@ def export_onnx(model, num_features: int):
     dummy_x_num = torch.randn(1, SEQ_LEN, num_features)
     dummy_x_emb = torch.zeros(1, 4, dtype=torch.long)
 
+    print(f"[DEBUG export] dummy_x_num shape={dummy_x_num.shape} dummy_x_emb shape={dummy_x_emb.shape} num_features={num_features}")                     #DEBUG
+
     torch.onnx.export(
         model,
         (dummy_x_num, dummy_x_emb),
@@ -42,5 +44,6 @@ def verify_onnx(num_features: int):
     dummy_emb = np.zeros((2,4), dtype=np.int64)
 
     outputs = sess.run(None, {"x_num": dummy_num, "x_emb": dummy_emb})
+    print(f"[DEBUG export] onnx output shapes={[np.asanyarray(o).shape for o in outputs]} any_nan={[bool(np.isnan(np.asanyarray(o)).any()) for o in outputs]}")              #DEBUG
     log.info(f"ONNX verified - output shapes: {[np.asanyarray(o).shape for o in outputs]}")
     return outputs

@@ -40,6 +40,8 @@ def write_hdf5(cleaned: dict) -> None:
                         try:
                             store.put(hdf_key, df, format='table', data_columns=True, complevel=5, complib="blosc")
 
+                            print(f"[DEBUG hdf5] writing key={hdf_key} shape={df.shape} nan={df.isna().sum().sum()}")
+
                             storer = cast(Any, store).get_storer(hdf_key)
                             if storer is not None:
                                 storer.attrs.metadata = {
@@ -81,6 +83,7 @@ def read_hdf5(market: str, region: str, ticker: str, interval: str) -> pd.DataFr
         with pd.HDFStore(str(HDF5_PATH), mode='r') as store:
             if key in store:
                 df = cast(pd.DataFrame, store[key])
+                print(f"[DEBUG hdf5] read {key}: shape={df.shape}")                 #DEBUG
                 return df
             else:
                 log.warning(f"Key {key} not found in HDF5 store")

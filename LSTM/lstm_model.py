@@ -88,6 +88,9 @@ class MarketLSTM(nn.Module):
 
         B, T, _ = x_num.shape
 
+        print(f"[DEBUG model] x_num shape={x_num.shape} x_emb shape={x_emb.shape} x_num_nan={torch.isnan(x_num).any().item()}")               #DEBUG
+        print(f"[DEBUG model] x_emb max per col={x_emb.max(dim=0).values.tolist()} min per col={x_emb.min(dim=0).values.tolist()}")           #DEBUG
+
         t_emb = self.ticker_emb(x_emb[:, 0])
         m_emb = self.market_emb(x_emb[:, 1])
         r_emb = self.region_emb(x_emb[:, 2])
@@ -105,5 +108,7 @@ class MarketLSTM(nn.Module):
 
         price_pred = self.price_head(context)
         dir_pred = self.dir_head(context)
+
+        print(f"[DEBUG model] price_pred nan={torch.isnan(price_pred).any().item()} dir_pred nan={torch.isnan(dir_pred).any().item()} attn_sum≈{attn_weights.sum(dim=1)[0].item():.4f}")                     #DEBUG
 
         return price_pred, dir_pred, attn_weights

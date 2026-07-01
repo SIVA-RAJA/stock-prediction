@@ -141,6 +141,9 @@ def add_featurers(
 
     df = df.copy()
     n = len(df)
+
+    print(f"[DEBUG features] {ticker}@{interval} IN: n={n} has_nan_ohlcv={df[['open','high','low','close','volume']].isna().any().any()}")         #DEBUG
+
     open, high, low, close, volume = df['open'], df['high'], df['low'], df['close'], df['volume']
 
     def w(period):
@@ -253,6 +256,7 @@ def add_featurers(
     df = df.ffill().bfill()
     df.dropna(inplace=True)
     n_after = len(df)
+    print(f"[DEBUG features] {ticker}@{interval} after dropna: {n_before}->{n_after} cols={df.shape[1]} inf_count={np.isinf(df.select_dtypes(include=[np.number])).sum().sum()}")                #DEBUG
     log.debug(f"Feature warm-up dropped {n_before - n_after} rows -> {n_after} rows remaining")
 
     if n_after < MIN_ROWS:
@@ -277,5 +281,7 @@ def add_features_all(cleaned: dict) -> dict:
                         ok += 1
                     else:
                         skip +=1
+
+    print(f"[DEBUG features] TOTAL ok={ok} skip={skip}")           #DEBUG
     log.info(f"Feature engineering completed: {ok} datasets processed, {skip} skipped")
     return featured

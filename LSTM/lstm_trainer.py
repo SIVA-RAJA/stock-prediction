@@ -71,6 +71,9 @@ def _run_epoch(
             with torch.autocast(device_type=DEVICE, enabled=USE_AMP):
                 price_pred, dir_pred, _ = model(x_num, x_emb)
                 loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir)
+                if torch.isnan(loss) or torch.isinf(loss):
+                    print(f"[DEBUG trainer] NaN/Inf loss detected! loss={loss.item()} lp={lp.item()} ld={ld.item()}")            #DEBUG
+                    print(f"[DEBUG trainer] price_pred stats: min={price_pred.min().item()} max={price_pred.max().item()}")      #DEBUG
 
             if is_train:
                 assert optimizer is not None, "optimizer must be provided when is_train=True"
@@ -161,6 +164,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     log.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     criterion = MultiTaskLoss()
+    print(f"[DEBUG trainer] starting train: epochs={NUM_EPOCHS} lr={LEARNING_RATE} device={DEVICE}")             #DEBUG
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer, T_0=SCHEDULER_TO, T_mult=SCHEDULER_T_MULT
@@ -174,6 +178,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     if RESUME_CKPT.exists():
         log.info(f"Resuming training from checkpoint {RESUME_CKPT.name}")
         ckpt = torch.load(RESUME_CKPT, map_location=DEVICE)
+        print(f"[DEBUG trainer] resumed from epoch={ckpt['epoch']} best_val_loss={ckpt.get('best_val_loss')}")           #DEBUG
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])

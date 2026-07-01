@@ -38,6 +38,7 @@ def fit_and_scale(df: pd.DataFrame, ticker: str, interval: str, save: bool = Tru
     scaler = RobustScaler()
     df[cols] = scaler.fit_transform(df[cols])
     df[cols] = df[cols].clip(-10, 10)
+    print(f"[DEBUG scaler] {ticker}@{interval} fit: cols={len(cols)} nan_after_scale={df[cols].isna().sum().sum()} max_abs={df[cols].abs().max().max():.2f}")              #DEBUG
 
     if save:
         path = _scaler_path(ticker, interval)
@@ -55,6 +56,8 @@ def load_scaler(ticker: str, interval: str) -> tuple[RobustScaler, list[str]] | 
         return None
 
     data = joblib.load(path)
+    print(f"[DEBUG scaler] {ticker}@{interval} loaded: cols={len(data['cols'])} nan_after_load={pd.DataFrame(data['cols'], columns=['col']).isna().sum().sum()}")              #DEBUG
+
     return data["scaler"], data["cols"]
 
 
@@ -75,6 +78,8 @@ def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame 
             dummy[:, i] = df[col].to_numpy()
 
     inv = scaler.inverse_transform(dummy)
+
+    print(f"[DEBUG scaler] inverse_scale {ticker}/{interval}: present_cols={len(present)}/{len(cols)}")                        #DEBUG
 
     for i, col in enumerate(cols):
         if col in present:

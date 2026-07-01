@@ -102,6 +102,9 @@ def build_embeddings_maps():
 
 TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID = build_embeddings_maps()
 
+print(f"[DEBUG config] tickers={len(TICKER_TO_ID)} markets={len(MARKET_TO_ID)} regions={len(REGION_TO_ID)} intervals={len(INTERVAL_TO_ID)}")       #DEBUG
+assert len(TICKER_TO_ID) > 0, "TICKER_TO_ID is empty — build_embeddings_maps() broken"             #DEBUG
+
 MIN_ROWS = 30
 
 SMA_WINDOWS = [10, 20, 50, 200]

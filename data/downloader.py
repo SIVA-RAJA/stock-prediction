@@ -64,6 +64,7 @@ def _extract_single(df_multi: pd.DataFrame, ticker: str) -> Optional[pd.DataFram
 
         required = {"open", "high", "low", "close", "volume"}
         if not required.issubset(set(df.columns)):
+            print(f"[DEBUG downloader] {ticker}: columns={list(df.columns)} missing={required - set(df.columns)}")           #DEBUG
             return None
 
         df = df[["open", "high", "low", "close", "volume"]]
@@ -102,6 +103,7 @@ def download_all(
 
             try:
                 df_multi = _download_batch(batch, period, interval)
+                print(f"[DEBUG downloader] batch={batch} interval={interval} shape={None if df_multi is None else df_multi.shape} empty={df_multi is None or df_multi.empty}")      #DEBUG
             except Exception as e:
                 log.error(f"Batch download failed after retries: {e}")
                 continue
@@ -112,6 +114,9 @@ def download_all(
 
             for tk in batch:
                 df_single = _extract_single(df_multi, tk)
+
+                if df_single is not None:          #DEBUG
+                    print(f"[DEBUG downloader] {tk} @ {interval}: rows={len(df_single)} nan_count={df_single.isna().sum().sum()}")                #DEBUG
                 if df_single is None or df_single.empty:
                     log.warning(f" No data:{tk} @ {interval}")
                     continue
