@@ -73,11 +73,10 @@ def _build_groups(df,  split: str) -> tuple:
 
 class MarketDataset(Dataset):
 
-    def __init__(self, groups, close_idx, price_col_idxs):
+    def __init__(self, groups, close_idx):
 
         self.groups = groups
         self.close_idx = close_idx
-        self.price_col_idxs = price_col_idxs
         self.index = []
 
         for gi, (vala, _) in enumerate(groups):
@@ -98,9 +97,6 @@ class MarketDataset(Dataset):
         target = end + PRED_HORIZON - 1
 
         window = vals[row:end].copy()
-        base = window[0, self.close_idx]
-        if base != 0 and not np.isnan(base):
-            window[:, self.price_col_idxs] /= base
 
         return (
             torch.from_numpy(window),
@@ -121,7 +117,7 @@ def make_dataloaders(force_rebuild: bool = False):
         if num_features is None:
             num_features = len(num_clos)
 
-        ds = MarketDataset(groups, close_idx, price_col_idxs)
+        ds = MarketDataset(groups, close_idx)
         loaders[split] = DataLoader(
             ds,
             batch_size=BATCH_SIZE,
