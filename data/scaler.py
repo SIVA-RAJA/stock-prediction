@@ -40,7 +40,7 @@ def fit_and_scale(df: pd.DataFrame, ticker: str, interval: str, save: bool = Tru
 
     if save:
         path = _scaler_path(ticker, interval)
-        joblib.dump({"scalar": scaler, "cols": cols}, path)
+        joblib.dump({"scaler": scaler, "cols": cols}, path)
         log.debug(f"Scaler saved to {path.name}")
 
     return df, scaler, cols
@@ -54,7 +54,7 @@ def load_scaler(ticker: str, interval: str) -> tuple[RobustScaler, list[str]] | 
         return None
 
     data = joblib.load(path)
-    return data["scalar"], data["cols"]
+    return data["scaler"], data["cols"]
 
 
 def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame | None:

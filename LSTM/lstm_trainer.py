@@ -224,7 +224,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
             best_val_loss = val_loss
             _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, BEST_CKPT, best_val_loss)
             log.info(f"New best model saved at epoch {epoch} with val_loss={val_loss:.6f}")
-        _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, RESUME_CKPT, best_val_loss=None)
+        _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, RESUME_CKPT, best_val_loss=best_val_loss)
 
         if early_stop.step(val_loss):
             log.info(f"Early stopping triggered at epoch {epoch}")

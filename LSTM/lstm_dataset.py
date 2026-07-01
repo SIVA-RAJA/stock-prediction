@@ -35,15 +35,6 @@ def _build_groups(df,  split: str) -> tuple:
     num_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
     close_idx = num_cols.index("close")
 
-    PRICE_COLS = (
-        ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap",
-        "macd", "macd_signal", "macd_hist", "atr_14", "hl_range", "co_range"]
-        + [c for c in num_cols if c.startswith("sma_")]
-        + [c for c in num_cols if c.startswith("ema_")]
-        + [c for c in num_cols if c.startswith("close_lag_")]
-    )
-    price_col_idxs = [num_cols.index(c) for c in PRICE_COLS if c in num_cols]
-
     groups = []
 
     for (ticker, interval), group in df.groupby(["ticker", "interval"], sort=False):
@@ -68,7 +59,7 @@ def _build_groups(df,  split: str) -> tuple:
         emb = g[EMB_COLS].values.astype(np.int64)
         groups.append((val, emb))
 
-    return groups, num_cols, close_idx, price_col_idxs
+    return groups, num_cols, close_idx
 
 
 class MarketDataset(Dataset):
@@ -113,7 +104,7 @@ def make_dataloaders(force_rebuild: bool = False):
     loaders = {}
 
     for split in ("train", "val", "test"):
-        groups, num_clos, close_idx, price_col_idxs = _build_groups(df, split)
+        groups, num_clos, close_idx = _build_groups(df, split)
         if num_features is None:
             num_features = len(num_clos)
 

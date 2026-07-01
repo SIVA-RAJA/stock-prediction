@@ -76,7 +76,7 @@ class MarketLSTM(nn.Module):
         for name, param in self.named_parameters():
             if "weight_ih" in name:
                 nn.init.xavier_uniform_(param)
-            elif"weight_hh" in name:
+            elif "weight_hh" in name:
                 nn.init.orthogonal_(param)
             elif "bias" in name:
                 nn.init.zeros_(param)

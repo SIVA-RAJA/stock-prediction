@@ -169,13 +169,13 @@ def add_featurers(
         aw = w(period)
         col = f"sma_{period}"
         df[col] = close.rolling(aw).mean()
-        df[col] = df[col].fillna(close.expanding().mean())
+        df[col] = df[col].fillna(close.shift(1).expanding().mean())
 
     for period in EMA_WINDOWS:
         aw = w(period)
         col = f"ema_{period}"
-        df[col] = close.ewm(span=aw, min_periods=aw).mean()
-        df[col] = df[col].fillna(close.expanding().mean())
+        df[col] = df[col] = close.ewm(span=aw, min_periods=aw).mean()
+        df[col] = df[col].fillna(close.shift(1).expanding().mean())
 
     fast = w(MACD_FAST)
     slow = w(MACD_SLOW)
