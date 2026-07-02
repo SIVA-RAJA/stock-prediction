@@ -16,8 +16,6 @@ DEVICE = (
     "mps" if torch.backends.mps.is_available() else
     "cpu" )
 
-print(f"[DEBUG lstm_config] DEVICE={DEVICE} cuda_available={torch.cuda.is_available()} mps_available={torch.backends.mps.is_available()}")         #DEBUG
-
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.benchmark = True

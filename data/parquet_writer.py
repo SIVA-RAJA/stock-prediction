@@ -34,8 +34,6 @@ def write_parquet(scaled: dict) -> None:
         raise ValueError("No data to write to Parquet")
 
     combined = pd.concat(all_dfs, ignore_index=True)
-    print(f"[DEBUG parquet] combined shape={combined.shape} dtypes_object_cols={[c for c in combined.columns if combined[c].dtype==object]}")                             #DEBUG
-    print(f"[DEBUG parquet] nan_per_col:\n{combined.isna().sum()[combined.isna().sum()>0]}")                   #DEBUG
     log.info(f"Total rows to write: {len(combined):,} | columns: {list(combined.columns)}")
 
     table = pa.Table.from_pandas(combined, preserve_index=False)
@@ -56,6 +54,5 @@ def read_parquet(ticker: str | None = None, market: str | None = None, interval:
 
     dataset = pq.read_table(str(PARQUET_PATH), filters=filters if filters else None,)
     df = dataset.to_pandas()
-    print(f"[DEBUG parquet] read shape={df.shape} filters={filters}")                 #DEBUG
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
     return df

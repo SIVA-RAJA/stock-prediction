@@ -51,9 +51,6 @@ def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interv
         interval = ID_TO_INTERVAL.get(int(interval_id))
         mask = (ticker_ids == ticker_id) & (interval_ids == interval_id)
 
-        if ticker is None or interval is None:                #DEBUG
-            print(f"[DEBUG evaluate] UNMAPPED ticker_id={ticker_id} interval_id={interval_id} — {mask.sum()} samples affected")             #DEBUG
-
         if ticker is None or interval is None:
             log.warning(f"Unknown ticker_id={ticker_id}/interval_id={interval_id}; leaving {mask.sum()} samples scaled")
             out[mask] = scaled_values[mask]
@@ -97,8 +94,6 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     emb_all = np.concatenate(all_emb)
     ticker_ids, interval_ids = emb_all[:, 0], emb_all[:, 3]
 
-    print(f"[DEBUG evaluate] total_samples={len(price_pred_sc)} price_pred_nan={np.isnan(price_pred_sc).sum()} price_true_nan={np.isnan(price_true_sc).sum()}")                #DEBUG
-
     log.info("Inverse-scaling predictions per ticker before computing metrics...")
     price_pred_sc = _inverse_close_all(price_pred_sc, ticker_ids, interval_ids)
     price_true_sc = _inverse_close_all(price_true_sc, ticker_ids, interval_ids)
@@ -106,8 +101,6 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     mae = np.mean(np.abs(price_pred_sc - price_true_sc))
     rmse = np.sqrt(np.mean((price_pred_sc - price_true_sc) ** 2))
     mape = np.mean(np.abs((price_pred_sc - price_true_sc) / np.where(price_true_sc == 0, 1e-8, price_true_sc))) * 100
-
-    print(f"[DEBUG evaluate] mae={mae} rmse={rmse} mape={mape} — check for inf if mape huge")             #DEBUG
 
     dir_binary = (dir_pred_raw >= 0.5).astype(int)
     dir_true_i = dir_true.astype(int)

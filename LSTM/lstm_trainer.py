@@ -71,9 +71,6 @@ def _run_epoch(
             with torch.autocast(device_type=DEVICE, enabled=USE_AMP):
                 price_pred, dir_pred, _ = model(x_num, x_emb)
                 loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir)
-                if torch.isnan(loss) or torch.isinf(loss):
-                    print(f"[DEBUG trainer] NaN/Inf loss detected! loss={loss.item()} lp={lp.item()} ld={ld.item()}")            #DEBUG
-                    print(f"[DEBUG trainer] price_pred stats: min={price_pred.min().item()} max={price_pred.max().item()}")      #DEBUG
 
             if is_train:
                 assert optimizer is not None, "optimizer must be provided when is_train=True"
@@ -131,12 +128,13 @@ class EarlyStopping:
         return self.should_stop
 
 
-def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, path, best_val_loss=None):
+def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, path, best_val_loss=None, early_stop_counter=0):
 
     torch.save({
         "epoch": epoch,
         "val_loss": val_loss,
         "best_val_loss": best_val_loss,
+        "early_stop_counter": early_stop_counter,
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
@@ -164,12 +162,11 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     log.info(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     criterion = MultiTaskLoss()
-    print(f"[DEBUG trainer] starting train: epochs={NUM_EPOCHS} lr={LEARNING_RATE} device={DEVICE}")             #DEBUG
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer, T_0=SCHEDULER_TO, T_mult=SCHEDULER_T_MULT
     )
-    scaler_amp = torch.amp.GradScaler(DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
+    scaler_amp = torch.amp.grad_scaler.GradScaler(DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
     best_val_loss = float("inf")
@@ -178,7 +175,6 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     if RESUME_CKPT.exists():
         log.info(f"Resuming training from checkpoint {RESUME_CKPT.name}")
         ckpt = torch.load(RESUME_CKPT, map_location=DEVICE)
-        print(f"[DEBUG trainer] resumed from epoch={ckpt['epoch']} best_val_loss={ckpt.get('best_val_loss')}")           #DEBUG
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
@@ -188,6 +184,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         start_epoch = ckpt["epoch"] + 1
         best_val_loss = ckpt.get("best_val_loss", float("inf"))
         early_stop.best_loss = best_val_loss
+        early_stop.counter = ckpt.get("early_stop_counter", 0)
 
     for epoch in range(start_epoch, NUM_EPOCHS + 1):
 
@@ -200,17 +197,21 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         elapsed = time.time() - t0
 
         if DEVICE == "cuda":
-            mem_used = torch.cuda.memory_reserved(0) / 1e9
-            mem_total = torch.cuda.get_device_properties(0).total_memory / 1e9
+            dev_idx = torch.cuda.current_device()
+            mem_used = torch.cuda.memory_reserved(dev_idx) / 1e9
+            mem_total = torch.cuda.get_device_properties(dev_idx).total_memory / 1e9
             gpu_str = f" GPU Memory: {mem_used:.2f}GB / {mem_total:.2f}GB"
         else:
             gpu_str = ""
 
 
-        log.info(f"Epoch {epoch}/{NUM_EPOCHS} | "
+        log.info(f"Epoch {epoch}/{NUM_EPOCHS} |"
+                 f" LR: {optimizer.param_groups[0]['lr']:.8f} | "
                  f"Time: {elapsed:.2f}s {gpu_str} | "
                  f"Train Loss: {tr_loss:.6f} (Price: {tr_lp:.6f}, Dir: {tr_ld:.6f}) | "
                  f"Val Loss: {val_loss:.6f} (Price: {val_lp:.6f}, Dir: {val_ld:.6f}) | "
+                 f"Gap: {val_loss - tr_loss:.6f} | "
+                 f"Best Val Loss: {best_val_loss:.6f} | "
                  f"Val Metrics: MAE: {val_m['mae']:.6f}, RMSE: {val_m['rmse']:.6f}, Dir Acc: {val_m['dir_acc']:.6f}, F1: {val_m['f1']:.6f}")
 
         writer.add_scalars("Loss/total", {"train": tr_loss, "val": val_loss}, epoch)
@@ -223,15 +224,17 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         writer.add_scalars("Learning Rate", {"lr": optimizer.param_groups[0]["lr"]}, epoch)
 
         if DEVICE == "cuda":
-            writer.add_scalar("GPU Memory (GB)", torch.cuda.memory_reserved(0) / 1e9, epoch)
+            writer.add_scalar("GPU Memory (GB)", torch.cuda.memory_reserved((torch.cuda.current_device())) / 1e9, epoch)
+
+        should_stop = early_stop.step(val_loss)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, BEST_CKPT, best_val_loss)
+            _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, BEST_CKPT, best_val_loss, early_stop.counter)
             log.info(f"New best model saved at epoch {epoch} with val_loss={val_loss:.6f}")
-        _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, RESUME_CKPT, best_val_loss=best_val_loss)
+        _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, RESUME_CKPT, best_val_loss=best_val_loss, early_stop_counter=early_stop.counter)
 
-        if early_stop.step(val_loss):
+        if should_stop:
             log.info(f"Early stopping triggered at epoch {epoch}")
             break
 

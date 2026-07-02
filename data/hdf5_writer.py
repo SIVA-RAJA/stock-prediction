@@ -83,7 +83,6 @@ def read_hdf5(market: str, region: str, ticker: str, interval: str) -> pd.DataFr
         with pd.HDFStore(str(HDF5_PATH), mode='r') as store:
             if key in store:
                 df = cast(pd.DataFrame, store[key])
-                print(f"[DEBUG hdf5] read {key}: shape={df.shape}")                 #DEBUG
                 return df
             else:
                 log.warning(f"Key {key} not found in HDF5 store")

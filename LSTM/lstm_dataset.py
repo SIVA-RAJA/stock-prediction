@@ -25,7 +25,6 @@ def _load_parquet() -> pd.DataFrame:
     df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
     df.sort_values(["ticker", "interval", "datetime"], inplace = True)
     df.reset_index(drop = True, inplace = True)
-    print(f"[DEBUG dataset] loaded shape={df.shape} datetime_range=({df['datetime'].min()}, {df['datetime'].max()}) nan_total={df.isna().sum().sum()}")            #DEBUG
     log.info(f"Loaded {len(df):,} rows | {df['ticker'].nunique():,} tickers | {df['interval'].nunique():,} intervals")
     return df
 
@@ -48,8 +47,6 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
         n_tr = int(n * TRAIN_FRAC)
         n_val = int(n * VAL_FRAC)
 
-        print(f"[DEBUG dataset] {ticker}/{interval}: n={n} n_tr={n_tr} n_val={n_val} n_test={n - n_tr - n_val}")           #DEBUG
-
         g_train = g.iloc[:n_tr].copy()
         g_val = g.iloc[n_tr:n_tr + n_val].copy()
         g_test = g.iloc[n_tr + n_val:].copy()
@@ -58,8 +55,6 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
             continue
 
         g_train_scaled, scaler, scale_cols = fit_and_scale(g_train, ticker, interval, save=True)
-
-        print(f"[DEBUG dataset] {ticker}/{interval}: scale_cols={len(scale_cols)} nan_after_fit={g_train_scaled.isna().sum().sum()}")          #DEBUG
 
         splits = {"train": g_train_scaled}
         for name, g_split in (("val", g_val), ("test", g_test)):
@@ -76,8 +71,6 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
             val_arr = g_split[num_cols].values.astype(np.float32)
             emb_arr = g_split[EMB_COLS].values.astype(np.int64)
             groups[name].append((val_arr, emb_arr))
-
-    print(f"[DEBUG dataset] group counts: train={len(groups['train'])} val={len(groups['val'])} test={len(groups['test'])} num_features={len(num_cols)} close_idx={close_idx}")                    #DEBUG
 
     return groups, num_cols, close_idx
 
@@ -108,9 +101,6 @@ class MarketDataset(Dataset):
 
         window = vals[row:end].copy()
 
-        if torch.isnan(torch.from_numpy(window)).any():
-            print(f"[DEBUG dataset] NaN detected in window at idx={idx}, group={gi}, row={row}")         #DEBUG
-
         return (
             torch.from_numpy(window),
             torch.from_numpy(emb[end - 1]),
@@ -124,7 +114,6 @@ def make_dataloaders(force_rebuild: bool = False):
     df = _load_parquet()
     groups_by_split, num_cols, close_idx = _build_all_groups(df)
     num_features = len(num_cols)
-    print(f"[DEBUG dataset] num_features={num_features}")          #DEBUG
     loaders = {}
 
     for split in ("train", "val", "test"):
