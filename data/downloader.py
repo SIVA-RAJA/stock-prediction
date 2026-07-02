@@ -26,6 +26,7 @@ def _flat_tickers() -> list[str]:
 @retry(
     retry=retry_if_exception_type((requests.exceptions.ConnectionError,
                                    requests.exceptions.Timeout,
+                                   requests.exceptions.HTTPError,
                                 )),
     wait=wait_exponential(multiplier=2, min=4, max=60),
     stop=stop_after_attempt(5),
@@ -112,7 +113,7 @@ def download_all(
 
             for tk in batch:
                 df_single = _extract_single(df_multi, tk)
-                
+
                 if df_single is None or df_single.empty:
                     log.warning(f" No data:{tk} @ {interval}")
                     continue

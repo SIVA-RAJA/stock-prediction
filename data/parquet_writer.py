@@ -21,7 +21,9 @@ def write_parquet(scaled: dict) -> None:
 
                     df_out = df.copy()
                     df_out.reset_index(inplace=True)
-                    df_out["datetime"] = df_out["datetime"].astype(str)
+                    numeric_cols = [c for c in df_out.columns if c not in ("ticker", "market", "region", "interval", "datetime")]
+                    df_out[numeric_cols] = df_out[numeric_cols].apply(pd.to_numeric, errors="coerce")
+                    df_out["datetime"] = pd.to_datetime(df_out["datetime"], utc=True).astype(str)
 
                     df_out.insert(0, "ticker", ticker)
                     df_out.insert(1, "market", market)

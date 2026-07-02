@@ -10,17 +10,14 @@ matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
 from .lstm_config import DEVICE, CHECKPOINT_DIR
-from data.config import TICKER_TO_ID, INTERVAL_TO_ID
+from data.config import ID_TO_INTERVAL, ID_TO_TICKER
 from data.scaler import load_scaler
 
 
 log = logging.getLogger(__name__)
 RESULTS_DIR = CHECKPOINT_DIR / "results"
-RESULTS_DIR.mkdir(exist_ok=True)
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-
-ID_TO_TICKER = {v: k for k, v in TICKER_TO_ID.items()}
-ID_TO_INTERVAL = {v: k for k, v in INTERVAL_TO_ID.items()}
 
 def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np.ndarray:
 

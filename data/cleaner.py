@@ -84,6 +84,11 @@ def clean_data(df: pd.DataFrame, ticker: str, interval: str, market: str) -> pd.
         log.debug(f"{ticker} @ {interval}: dropping {bad_close.sum()} close-out-of-range rows")
         df = df[~bad_close]
 
+    bad_open = (df['open'] < df['low']) | (df['open'] > df['high'])
+    if bad_open.sum():
+        log.debug(f"{ticker} @ {interval}: dropping {bad_open.sum()} open-out-of-range rows")
+        df = df[~bad_open]
+
     if market in ("FOREX", "INDICES"):
         df["volume"] = 0.0
     else:
@@ -114,7 +119,11 @@ def clean_all(raw: dict) -> dict:
             for ticker, intervals in tickers.items():
                 cleaned[market][region][ticker] = {}
                 for interval, df in intervals.items():
-                    result = clean_data(df, ticker, interval, market)
+                    try:
+                        result = clean_data(df, ticker, interval, market)
+                    except Exception as e:
+                        log.error(f"{ticker} @ {interval}: Error occurred while cleaning data: {e}")
+                        result = None
                     if result is not None:
                         cleaned[market][region][ticker][interval] = result
                         ok += 1

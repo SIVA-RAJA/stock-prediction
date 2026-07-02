@@ -116,7 +116,8 @@ def _window_normalize(df, window=20):
     base = base.fillna(df["close"].iloc[0])
     base = base.replace(0, np.nan).ffill().bfill().fillna(1.0)
 
-    price_cols = ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap"] + [f"sma_{w}" for w in SMA_WINDOWS] + [f"ema_{w}" for w in EMA_WINDOWS] + [f"close_lag_{lag}" for lag in LAG_WINDOWS]
+    price_cols = ["open", "high", "low", "close", "bb_upper", "bb_mid", "bb_lower", "vwap",
+              "hl_range", "co_range", f"atr_{ATR_PERIOD}"] + [f"sma_{w}" for w in SMA_WINDOWS] + [f"ema_{w}" for w in EMA_WINDOWS] + [f"close_lag_{lag}" for lag in LAG_WINDOWS]
 
     for col in price_cols:
         if col in df.columns:
@@ -125,7 +126,7 @@ def _window_normalize(df, window=20):
 
 def _market_regime(close, window=20):
     ret = close.pct_change(window)
-    std = close.pct_change().rolling(window).std()
+    std = close.pct_change().rolling(window).std() * np.sqrt(window)
     regime = np.where(ret > std, 1, np.where(ret < -std, -1, 0))
     return pd.Series(regime, index=close.index, dtype=np.float32)
 
@@ -178,9 +179,10 @@ def add_featurers(
         df[col] = close.ewm(span=aw, min_periods=aw).mean()
         df[col] = df[col].fillna(close.shift(1).expanding().mean())
 
-    fast = w(MACD_FAST)
-    slow = w(MACD_SLOW)
-    signal = w(MACD_SIGNAL)
+    base_w = w(MACD_SLOW)
+    fast = max(2, int(base_w * MACD_FAST / MACD_SLOW))
+    slow = base_w
+    signal = max(2, int(base_w * MACD_SIGNAL / MACD_SLOW))
     df["macd"], df["macd_signal"], df["macd_hist"] = _macd(close, fast, slow, signal)
     df["macd"] = df["macd"].fillna(0)
     df["macd_signal"] = df["macd_signal"].fillna(0.0)

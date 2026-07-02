@@ -80,7 +80,7 @@ class MarketLSTM(nn.Module):
                 nn.init.orthogonal_(param)
             elif "bias" in name:
                 nn.init.zeros_(param)
-                if "bias_ih" in name or "bias_hh" in name:
+                if "bias_hh" in name:
                     n = param.size(0)
                     param.data[n // 4 : n // 2].fill_(1.0)
 

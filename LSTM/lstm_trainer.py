@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 
 from .lstm_config import (
     DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE,
-    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT,  RESUME_CKPT, LOG_DIR, USE_AMP
+    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ def _run_epoch(
                 assert optimizer is not None, "optimizer must be provided when is_train=True"
                 optimizer.zero_grad(set_to_none=True)
 
-                if USE_AMP:
+                if USE_AMP and DEVICE == "cuda":
                     scaler_amp.scale(loss).backward()
                     scaler_amp.unscale_(optimizer)
                     nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
@@ -139,7 +139,7 @@ def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, pa
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
-        "scaler_amp": scaler_amp.state_dict() if USE_AMP else None,
+        "scaler_amp": scaler_amp.state_dict() if (USE_AMP and DEVICE == "cuda") else None,
     }, path)
     log.info(f"Checkpoint saved at {Path(path).name} (val_loss={val_loss:.6f})")
 
@@ -180,7 +180,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
 
-        if ckpt.get("scaler_amp") and USE_AMP:
+        if ckpt.get("scaler_amp") and USE_AMP and DEVICE == "cuda":
             scaler_amp.load_state_dict(ckpt["scaler_amp"])
         start_epoch = ckpt["epoch"] + 1
         best_val_loss = ckpt.get("best_val_loss", float("inf"))
@@ -222,7 +222,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         writer.add_scalars("Metrics/RMSE", {"train": tr_m["rmse"], "val": val_m["rmse"]}, epoch)
         writer.add_scalars("Metrics/Direction Accuracy", {"train": tr_m["dir_acc"], "val": val_m["dir_acc"]}, epoch)
         writer.add_scalars("Metrics/F1 Score", {"train": tr_m["f1"], "val": val_m["f1"]}, epoch)
-        writer.add_scalars("Learning Rate", {"lr": optimizer.param_groups[0]["lr"]}, epoch)
+        writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], epoch)
 
         if DEVICE == "cuda":
             writer.add_scalar("GPU Memory (GB)", torch.cuda.memory_reserved((torch.cuda.current_device())) / 1e9, epoch)

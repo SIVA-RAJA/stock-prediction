@@ -43,6 +43,7 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
         interval = str(interval)
 
         g = group.sort_values("datetime").reset_index(drop=True)
+        g = g.dropna(subset=[c for c in g.columns if c not in EXCLUDE_COLS])
         n = len(g)
         n_tr = int(n * TRAIN_FRAC)
         n_val = int(n * VAL_FRAC)

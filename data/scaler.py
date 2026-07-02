@@ -34,10 +34,12 @@ def fit_and_scale(df: pd.DataFrame, ticker: str, interval: str, save: bool = Tru
 
     df = df.copy()
     cols = _scalable_cols(df)
-
     scaler = RobustScaler()
-    df[cols] = scaler.fit_transform(df[cols])
+    scaler.fit(df[cols])
+
+    df[cols] = scaler.transform(df[cols])
     df[cols] = df[cols].clip(-10, 10)
+
 
     if save:
         path = _scaler_path(ticker, interval)
@@ -82,4 +84,3 @@ def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame 
             df.loc[:, col] = inv[:, i]
 
     return df
-

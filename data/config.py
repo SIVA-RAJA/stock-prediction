@@ -19,7 +19,6 @@ CONFIGS = {
     "30m": ("60d",  "30m"),
     "90m": ("60d",  "90m"),
     "1h":  ("730d", "1h"),
-    "4h":  ("730d", "4h"),
     "1d":  ("max",  "1d"),
     "5d": ("max",  "5d"),
     "1wk": ("max",  "1wk"),
@@ -64,7 +63,7 @@ COMPANY_NAMES = {
     "RELIANCE.NS": "Reliance Industries Limited", "TCS.NS": "Tata Consultancy Services Limited", "HDFCBANK.NS": "HDFC Bank Limited", "INFY.NS": "Infosys Limited", "ICICIBANK.NS": "ICICI Bank Limited", "BHARTIARTL.NS": "Bharti Airtel Limited", "SBIN.NS": "State Bank of India", "LT.NS": "Larsen & Toubro Limited", "HINDUNILVR.NS": "Hindustan Unilever Limited", "SUNPHARMA.NS": "Sun Pharmaceutical Industries Limited",
     "7203.T": "Toyota Motor Corporation", "6758.T": "Sony Group Corporation", "8306.T": "Mitsubishi UFJ Financial Group, Inc.", "6501.T": "Hitachi, Ltd.", "7974.T": "Nintendo Co., Ltd.", "9984.T": "SoftBank Group Corp.", "6861.T": "Keyence Corporation", "9983.T": "Fast Retailing Co., Ltd.", "8035.T": "Tokyo Electron Limited", "7267.T": "Honda Motor Co., Ltd.",
     "601398.SS" : "Industrial and Commercial Bank of China Limited", "601318.SS": "Ping An Insurance Group Company of China, Ltd.", "600519.SS": "Kweichow Moutai Co., Ltd.", "600036.SS": "China Merchants Co., Ltd.", "601857.SS": "PetroChina Company Limited", "002594.SZ": "BYD Company Limited", "300750.SZ": "Contemporary Amperex Technology Co., Limited", "601088.SS": "China Shenhua Energy Company Limited", "000333.SZ": "Midea Group Co., Ltd.", "000858.SZ": "Wuliangye Yibin Co., Ltd.",
-    "2222.SR": "Saudi Armaco", "1120.SR": "Al Rajhi Banking and Investment Corporation", "1211.SR": "Saudi Arabian Mining Company (Maaden)", "1180.SR": "The Saudi National Bank", "7010.SR": "Saudi Telecom Company", "2010.SR": "Saudi Basic Industries Corporation", "2082.SR": "ACWA Power Company", "1010.SR": "Riyad Bank", "1150.SR": "Alinma Bank", "1060.SR": "Saudi Awwal Bank ",
+    "2222.SR": "Saudi Aramco", "1120.SR": "Al Rajhi Banking and Investment Corporation", "1211.SR": "Saudi Arabian Mining Company (Maaden)", "1180.SR": "The Saudi National Bank", "7010.SR": "Saudi Telecom Company", "2010.SR": "Saudi Basic Industries Corporation", "2082.SR": "ACWA Power Company", "1010.SR": "Riyad Bank", "1150.SR": "Alinma Bank", "1060.SR": "Saudi Awwal Bank ",
     "SHEL.L": "Shell plc", "AZN.L": "AstraZeneca plc", "ULVR.L": "Unilever plc", "HSBA.L": "HSBC Holdings plc", "BP.L": "BP p.l.c.", "RIO.L": "Rio Tinto Group", "GSK.L": "GSK plc", "REL.L": "RELX plc", "DGE.L": "Diageo plc", "NG.L": "National Grid plc",
     "BMW.DE": "Bayerische Motoren Werke Aktiengesellschaft", "SAP.DE": "SAP SE", "SIE.DE": "Siemens Aktiengesellschaft", "ALV.DE": "Allianz SE", "MBG.DE": "Mercedes-Benz Group AG", "DTE.DE": "Deutsche Telekom AG", "BAS.DE": "BASF SE", "MUV2.DE": "Münchener Rückversicherungs-Gesellschaft Aktiengesellschaft in München", "VOW3.DE": "Volkswagen AG", "ADS.DE": "Adidas AG",
     "AIR.PA": "Airbus SE", "MC.PA": "LVMH Moët Hennessy – Louis Vuitton, Société Européenne", "OR.PA": "L'Oréal S.A.", "TTE.PA": "TotalEnergies", "SAN.PA": "Sanofi", "BNP.PA": "BNP Paribas SA", "CAP.PA": "Capgemini SE", "CS.PA": "AXA SA", "SU.PA": "Schneider Electric S.E.", "ENGI.PA": "Engie SA",
@@ -101,6 +100,9 @@ def build_embeddings_maps():
     return ticker_to_id, market_to_id, region_to_id, interval_to_id
 
 TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID = build_embeddings_maps()
+
+ID_TO_TICKER = {v: k for k, v in TICKER_TO_ID.items()}
+ID_TO_INTERVAL = {v: k for k, v in INTERVAL_TO_ID.items()}
 
 
 MIN_ROWS = 30

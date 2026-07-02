@@ -4,6 +4,7 @@ from .lstm_config import CHECKPOINT_DIR, SEQ_LEN
 
 log = logging.getLogger(__name__)
 ONNX_PATH = CHECKPOINT_DIR / "market_lstm.onnx"
+CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 
 def export_onnx(model, num_features: int):
 
