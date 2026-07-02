@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 
 from .lstm_config import (
     DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE,
-    MIN_DELTA, SCHEDULER_TO, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT,  RESUME_CKPT, LOG_DIR, USE_AMP
+    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, LAST_CKPT,  RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
@@ -68,7 +68,8 @@ def _run_epoch(
             y_price = y_price.to(DEVICE, non_blocking=True)
             y_dir = y_dir.to(DEVICE, non_blocking=True)
 
-            with torch.autocast(device_type=DEVICE, enabled=USE_AMP):
+            autocast_device = "cuda" if DEVICE == "cuda" else "cpu"
+            with torch.autocast(device_type=autocast_device, enabled=(USE_AMP and DEVICE=="cuda")):
                 price_pred, dir_pred, _ = model(x_num, x_emb)
                 loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir)
 
@@ -164,9 +165,9 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
     criterion = MultiTaskLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=SCHEDULER_TO, T_mult=SCHEDULER_T_MULT
+        optimizer, T_0=SCHEDULER_T0, T_mult=SCHEDULER_T_MULT
     )
-    scaler_amp = torch.amp.grad_scaler.GradScaler(DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
+    scaler_amp = torch.amp.grad_scaler.GradScaler("cuda", enabled=(USE_AMP and DEVICE == "cuda"))
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
     best_val_loss = float("inf")

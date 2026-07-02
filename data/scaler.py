@@ -83,24 +83,3 @@ def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame 
 
     return df
 
-def scale_all(featured: dict) -> dict:
-
-    scaled = {}
-    ok = err = 0
-    for market, regions in featured.items():
-        scaled[market] = {}
-        for region, tickers in regions.items():
-            scaled[market][region] = {}
-            for ticker, intervals in tickers.items():
-                scaled[market][region][ticker] = {}
-                for interval, df in intervals.items():
-                    try:
-                        df_scaled, _, _ = fit_and_scale(df, ticker, interval, save=True)
-                        scaled[market][region][ticker][interval] = df_scaled
-                        ok += 1
-                    except Exception as e:
-                        log.error(f"Scaling failed for {ticker} @ {interval}: {e}")
-                        err += 1
-
-    log.info(f"Scaling completed: {ok} datasets scaled, {err} errors")
-    return scaled

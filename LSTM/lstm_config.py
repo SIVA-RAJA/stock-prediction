@@ -1,12 +1,11 @@
 import torch
 
-from data.config import DRIVE_ROOT, DATA_DIR
+from data.config import DRIVE_ROOT, MMAP_DIR
 
 
 BASE_DIR = DRIVE_ROOT
 CHECKPOINT_DIR = DRIVE_ROOT / "checkpoints"
 LOG_DIR = DRIVE_ROOT / "runs"
-MMAP_DIR = DATA_DIR / "mmap"
 
 for d in [CHECKPOINT_DIR, LOG_DIR, MMAP_DIR]:
     d.mkdir(parents=True, exist_ok=True)
@@ -48,7 +47,7 @@ NUM_EPOCHS = 100
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 
-SCHEDULER_TO = 10
+SCHEDULER_T0 = 10
 SCHEDULER_T_MULT = 2
 
 PATIENCE = 15

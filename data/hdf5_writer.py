@@ -40,8 +40,6 @@ def write_hdf5(cleaned: dict) -> None:
                         try:
                             store.put(hdf_key, df, format='table', data_columns=True, complevel=5, complib="blosc")
 
-                            print(f"[DEBUG hdf5] writing key={hdf_key} shape={df.shape} nan={df.isna().sum().sum()}")
-
                             storer = cast(Any, store).get_storer(hdf_key)
                             if storer is not None:
                                 storer.attrs.metadata = {
