@@ -9,25 +9,31 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 
 from .lstm_config import (
-    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, GRAD_CLIP, PATIENCE,
+    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, LAMBDA_ATTN, GRAD_CLIP, PATIENCE,
     MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
 
 class MultiTaskLoss(nn.Module):
-    def __init__(self, lambda_price=LAMBDA_PRICE, lambda_dir=LAMBDA_DIR):
+    def __init__(self, lambda_price=LAMBDA_PRICE, lambda_dir=LAMBDA_DIR, lambda_attn=LAMBDA_ATTN):
         super().__init__()
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss()
         self.lp = lambda_price
         self.ld = lambda_dir
+        self.la = lambda_attn
 
-    def forward(self, price_pred, price_true, dir_pred, dir_true) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, price_pred, price_true, dir_pred, dir_true, attn_weights) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         loss_price = self.mse(price_pred.squeeze(-1), price_true)
         loss_dir = self.bce(dir_pred.squeeze(-1), dir_true)
-        total = self.lp * loss_price + self.ld * loss_dir
+
+        eps = 1e-8
+        entropy =  -(attn_weights * torch.log(attn_weights + eps)).sum(dim=1).mean()
+        l_attn = -entropy
+
+        total = (self.lp * loss_price + self.ld * loss_dir + self.la * l_attn)
         return total, loss_price, loss_dir
 
 def _compute_metrics(price_preds: np.ndarray, price_trues: np.ndarray, dir_preds: np.ndarray, dir_trues: np.ndarray) -> dict:
@@ -72,8 +78,8 @@ def _run_epoch(
             try:
                 autocast_device = "cuda" if DEVICE == "cuda" else "cpu"
                 with torch.autocast(device_type=autocast_device, enabled=(USE_AMP and DEVICE=="cuda")):
-                    price_pred, dir_pred, _ = model(x_num, x_emb)
-                    loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir)
+                    price_pred, dir_pred, attn_weights = model(x_num, x_emb)
+                    loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir, attn_weights)
 
                 if is_train:
                     assert optimizer is not None, "optimizer must be provided when is_train=True"
@@ -164,7 +170,7 @@ def load_checkpoint(model, optimizer=None, scheduler=None, path=BEST_CKPT):
         optimizer.load_state_dict(ckpt["optimizer"])
     if scheduler:
         scheduler.load_state_dict(ckpt["scheduler"])
-        
+
     val_loss = ckpt.get('val_loss')
     log.info(f"Loaded checkpoint from epoch {ckpt['epoch']} val_loss={val_loss if val_loss is None else f'{val_loss:.6f}'}")
 

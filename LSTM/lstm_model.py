@@ -1,22 +1,72 @@
+import math
 import torch
 import torch.nn as nn
 from .lstm_config import( TICKER_EMB_DIM, MARKET_EMB_DIM, REGION_EMB_DIM, INTERVAL_EMB_DIM,
                         LSTM_HIDDEN, LSTM_LAYERS, LSTM_DROPOUT,BIDIRECTIONAL, ATTN_HIDDEN, HEAD_HIDDEN, HEAD_DROPOUT, )
 
 
-class AdditiveAttention(nn.Module):
+class  PositionalEncoding(nn.Module):
 
-    def __init__(self, hidden_dim: int, attn_dim: int):
+    def __init__(self, d_model: int, max_len: int = 512):
         super().__init__()
-        self.W = nn.Linear(hidden_dim, attn_dim, bias=False)
-        self.v = nn.Linear(attn_dim, 1, bias=False)
+        pe = torch.zeros(max_len, d_model)
+        pos = torch.arange(0, max_len).unsqueeze(1).float()
+        div = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
+            )
+        pe[:, 0::2] = torch.sin(pos * div)
+        pe[:, 1::2] = torch.cos(pos * div)
+        self.pe_tensor = nn.Parameter(pe.unsqueeze(0), requires_grad=False)
 
-    def forward(self, lstm_out: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        score = self.v(torch.tanh(self.W(lstm_out)))
-        weights = torch.softmax(score, dim=1)
-        context = (weights * lstm_out).sum(dim=1)
-        return context, weights.squeeze(-1)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
 
+        return x + self.pe_tensor[:, :x.size(1), :]
+
+
+class MultiHeadTemporalAttention(nn.Module):
+
+    def __init__(self, hidden_dim, num_heads=8, temperature=0.5, dropout=0.1):
+        super().__init__()
+        assert hidden_dim % num_heads == 0, f"hidden_dim {hidden_dim} must be divisible by num_heads {num_heads}"
+
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+        self.temperature = temperature
+        self.scale = math.sqrt(self.head_dim) * temperature
+        self.pos_enc = PositionalEncoding(hidden_dim)
+        self.Q = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.K = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.V = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(hidden_dim)
+
+    def  forward(self, x):
+        B, T, D = x.shape
+        x = self.pos_enc(x)
+        Q = self.Q(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        K = self.K(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+        V = self.V(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / self.scale
+
+        mask = torch.triu(torch.ones(T, T, device=x.device), diagonal=1).bool()
+        scores = scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), -1e9)
+
+        weights = torch.softmax(scores, dim=-1)
+        weights = self.dropout(weights)
+
+        out = torch.matmul(weights, V)
+        out = out.transpose(1, 2).contiguous().view(B, T, D)
+        out = self.out_proj(out)
+        out = self.norm(out + x)
+
+        context = out.mean(dim=1)
+
+        attn_viz = weights.mean(dim=1)
+        attn_viz = attn_viz.mean(dim=1)
+
+        return context, attn_viz
 
 class PredictionHead(nn.Module):
 
@@ -65,7 +115,12 @@ class MarketLSTM(nn.Module):
 
         lstm_out_dim = LSTM_HIDDEN * (2 if BIDIRECTIONAL else 1)
 
-        self.attention = AdditiveAttention(lstm_out_dim, ATTN_HIDDEN)
+        self.attention = MultiHeadTemporalAttention(
+            hidden_dim=lstm_out_dim,
+            num_heads=8,
+            temperature=0.5,
+            dropout=0.1)
+
         self.norm = nn.LayerNorm(lstm_out_dim)
         self.dropout = nn.Dropout(HEAD_DROPOUT)
         self.price_head = PredictionHead(lstm_out_dim, HEAD_HIDDEN, 1, HEAD_DROPOUT)
