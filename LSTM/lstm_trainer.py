@@ -150,6 +150,8 @@ class EarlyStopping:
 
 def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, path, best_val_loss=None, early_stop_counter=0):
 
+    tmp_path = Path(str(path) + ".tmp")
+
     torch.save({
         "epoch": epoch,
         "val_loss": val_loss,
@@ -159,7 +161,8 @@ def _save_checkpoint(model, optimizer,scheduler, scaler_amp, epoch, val_loss, pa
         "optimizer": optimizer.state_dict(),
         "scheduler": scheduler.state_dict(),
         "scaler_amp": scaler_amp.state_dict() if (USE_AMP and DEVICE == "cuda") else None,
-    }, path)
+    }, tmp_path)
+    tmp_path.replace(path)
     log.info(f"Checkpoint saved at {Path(path).name} (val_loss={val_loss:.6f})")
 
 def load_checkpoint(model, optimizer=None, scheduler=None, path=BEST_CKPT):

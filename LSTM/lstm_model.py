@@ -51,7 +51,8 @@ class MultiHeadTemporalAttention(nn.Module):
         scores = torch.matmul(Q, K.transpose(-2, -1)) / self.scale
 
         mask = torch.triu(torch.ones(T, T, device=x.device), diagonal=1).bool()
-        scores = scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), -1e9)
+        neg_inf = torch.finfo(scores.dtype).min
+        scores = scores.masked_fill(mask.unsqueeze(0).unsqueeze(0), neg_inf)
 
         weights = torch.softmax(scores, dim=-1)
         weights = self.dropout(weights)
