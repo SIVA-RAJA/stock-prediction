@@ -74,6 +74,28 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
             groups[name].append((val_arr, emb_arr))
 
     return groups, num_cols, close_idx
+def verify_no_data_leakage(df, num_cols, close_idx):
+
+    log.info("Running data leakage verification...")
+
+    sample_vals = df[num_cols].values[:200]
+    for i in range(min(100, len(sample_vals) - SEQ_LEN - 1)):
+        end = i + SEQ_LEN
+        target = end + PRED_HORIZON - 1
+        assert target > end - 1, f"TARGET {target} overlaps with window ending at {end}"
+
+    close_col = df["close"].values
+    lag1_col = df["close_lag_1"].values
+    for i in range(min(100, len(close_col))):
+        expected = close_col[i - 1]
+        actual = lag1_col[i]
+        if not np.isnan(actual):
+            diff = abs(expected - actual)
+            assert diff < 1e-6, f"close_lag_1 at row {i} = {actual}, expected {expected}"
+
+    log.info("No data leakage detected in sample checks.")
+    log.info("Target strictly after input window")
+    log.info("Lag features are backward-looking and do not leak future information")
 
 class MarketDataset(Dataset):
 

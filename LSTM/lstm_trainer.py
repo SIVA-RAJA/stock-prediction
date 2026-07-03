@@ -268,6 +268,13 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
             log.info(f"Early stopping triggered at epoch {epoch}")
             break
 
+        gap = tr_loss - val_loss
+        if epoch > 10:
+            if val_loss > best_val_loss * 1.05:
+                log.warning(f"Val loss {val_loss:.5f} is 5% above best val loss {best_val_loss:.5f} - Possible overfitting.")
+            if abs(gap) > 0.1:
+                log.warning(f"Large gap between train and val loss: {gap:.5f} - model memorizing training data.")
+
     writer.close()
 
     load_checkpoint(model, path=BEST_CKPT)
