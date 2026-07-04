@@ -166,7 +166,7 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
 
     window_df = scaled.iloc[-SEQ_LEN:]
     x_num = window_df[num_cols].values.astype(np.float32)[None, ...]
-    x_emb = window_df[EMB_COLS].values.astype(np.int64)[-1:, :1]
+    x_emb = window_df[EMB_COLS].values.astype(np.int64)[-1:, :]
 
     sess = _get_session()
 

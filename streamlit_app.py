@@ -56,9 +56,9 @@ if run:
     m1, m2, m3 = st.columns(3)
 
     m1.metric(label="Last Close Price", value=f"${result['last_close']:.2f}")
-    m2.metric(label="Predicted Close Price", value=f"{result['predicted_close']:.2f}", delta=f"{result['predicted_change_pct']:.2f}%")
-    m3.metric(label="Direction", value=f"{result['direction']:.2%}", delta=f"{result['direction_confidence']:.1%} confidence")
-
+    m2.metric(label="Predicted Close Price", value=f"${result['predicted_next_close']:.2f}", delta=f"{result['predicted_change_pct']:.2f}%")
+    m3.metric(label="Direction", value=result['direction'], delta=f"{result['direction_confidence']:.1%} confidence")
+    
     st.subheader("Attention over input window")
     attn = result["attention_weights"]
     attn_df = pd.DataFrame({"timestep (0=oldest, -1=most recent)": list(range(len(attn))), "attention_weight": attn}).set_index("timestep (0=oldest, -1=most recent)")
