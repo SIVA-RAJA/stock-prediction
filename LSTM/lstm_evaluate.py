@@ -9,13 +9,13 @@ import matplotlib
 matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
-from .lstm_config import DEVICE, CHECKPOINT_DIR
+from .lstm_config import DEVICE, EVAL_DIR
 from data.config import ID_TO_INTERVAL, ID_TO_TICKER
 from data.scaler import load_scaler
 
 
 log = logging.getLogger(__name__)
-RESULTS_DIR = CHECKPOINT_DIR / "results"
+RESULTS_DIR = EVAL_DIR / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 

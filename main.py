@@ -7,6 +7,7 @@ Say "y" and it cascades automatically; say "n" (or pipe non-interactively)
 and the run stops with an error telling you exactly which command to run.
 
 Usage:
+
     python main.py --download                 # download fresh data from yfinance, then run the full data pipeline
     python main.py --skip-download             # run the full data pipeline, reusing cached raw data if present
     python main.py --train-model                # train the LSTM (builds data first if missing)
@@ -39,10 +40,6 @@ LSTM_DIR = ROOT / "LSTM"
 for _p in (str(ROOT), str(DATA_DIR), str(LSTM_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
-
-LOG_DIR = ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
 
 # --------------------------------------------------------------------------- #
 # Logging setup
@@ -79,7 +76,7 @@ log = logging.getLogger("main")
 # LSTM/lstm_main.py now live here and are driven directly from main.py)
 # --------------------------------------------------------------------------- #
 
-from data.config import DATA_DIR as DATASET_DIR, PARQUET_PATH, TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID
+from data.config import ARTIFACTS_DIR, DATA_DIR as DATASET_DIR, PARQUET_PATH, TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID
 from data.downloader import download_all
 from data.cleaner import clean_all
 from data.hdf5_writer import write_hdf5
@@ -95,6 +92,9 @@ from LSTM.lstm_export import export_onnx, verify_onnx, ONNX_PATH
 
 RAW_CACHE_PATH = DATASET_DIR / "raw_cache.pkl"
 EVAL_CSV_PATH = RESULTS_DIR / "eval_predictions.csv"
+
+LOG_DIR = ARTIFACTS_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # --------------------------------------------------------------------------- #

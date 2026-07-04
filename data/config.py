@@ -1,14 +1,32 @@
 from pathlib import Path
 
-DRIVE_ROOT = Path("/content/drive/MyDrive/Stock Predictor")
-BASE_DIR = DRIVE_ROOT
-DATA_DIR = DRIVE_ROOT / "dataset"
+def _detect_project_root() -> Path:
+
+    try:
+        import google.colab             # noqa: F401
+        in_colab = True
+    except ImportError:
+        in_colab = False
+
+    if in_colab:
+        colab_path = Path("/content/drive/MyDrive/Stock Predictor")
+        if Path("/content/drive/MyDrive").exists():
+            return colab_path
+
+        return colab_path
+
+    return Path(__file__).resolve().parent.parent
+
+
+PROJECT_ROOT = _detect_project_root()
+BASE_DIR = PROJECT_ROOT
+ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
+DATA_DIR = ARTIFACTS_DIR / "dataset"
 PARQUET_PATH = DATA_DIR / "market_data_full.parquet"
 HDF5_PATH = DATA_DIR / "market_data.hd5"
 SCALER_DIR = DATA_DIR / "scalers"
-MMAP_DIR = DATA_DIR / "mmap"
 
-for d in [DATA_DIR, SCALER_DIR, MMAP_DIR]:
+for d in [DATA_DIR, SCALER_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 CONFIGS = {

@@ -17,7 +17,9 @@ env
 .ruff_cache/
 .ruff*
 
-.dataset/*
-.runs/*
-.checkpoints/*
-
+artifacts/*
+dataset/*
+runs/*
+checkpoints/*
+logs/*
+model/*

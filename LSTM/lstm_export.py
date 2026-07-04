@@ -1,10 +1,10 @@
 import torch
 import logging
-from .lstm_config import CHECKPOINT_DIR, SEQ_LEN
+from .lstm_config import MODEL_DIR, SEQ_LEN
 
 log = logging.getLogger(__name__)
-ONNX_PATH = CHECKPOINT_DIR / "market_lstm.onnx"
-CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+ONNX_PATH = MODEL_DIR / "market_lstm.onnx"
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 def export_onnx(model, num_features: int):
 
@@ -18,7 +18,8 @@ def export_onnx(model, num_features: int):
         model,
         (dummy_x_num, dummy_x_emb),
         str(ONNX_PATH),
-        opset_version=17,
+        opset_version=18,
+        dynamo=False,
         input_names=["x_num", "x_emb"],
         output_names=["price_pred", "dir_pred", "attn_weights"],
         dynamic_axes={
@@ -44,4 +45,5 @@ def verify_onnx(num_features: int):
 
     outputs = sess.run(None, {"x_num": dummy_num, "x_emb": dummy_emb})
     log.info(f"ONNX verified - output shapes: {[np.asanyarray(o).shape for o in outputs]}")
+    
     return outputs

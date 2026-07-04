@@ -1,13 +1,13 @@
 import torch
 
-from data.config import DRIVE_ROOT, MMAP_DIR
+from data.config import ARTIFACTS_DIR
 
+CHECKPOINT_DIR = ARTIFACTS_DIR / "checkpoints"
+MODEL_DIR = ARTIFACTS_DIR / "model"
+EVAL_DIR = ARTIFACTS_DIR / "evaluation"
+LOG_DIR = ARTIFACTS_DIR / "runs"
 
-BASE_DIR = DRIVE_ROOT
-CHECKPOINT_DIR = DRIVE_ROOT / "checkpoints"
-LOG_DIR = DRIVE_ROOT / "runs"
-
-for d in [CHECKPOINT_DIR, LOG_DIR, MMAP_DIR]:
+for d in [CHECKPOINT_DIR, MODEL_DIR, EVAL_DIR, LOG_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 DEVICE = (
