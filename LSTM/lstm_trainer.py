@@ -69,7 +69,7 @@ def _run_epoch(
     ctx = torch.enable_grad() if is_train else torch.no_grad()
     with ctx:
         n_batches = 0
-        for x_num, x_emb, y_price, y_dir in loader:
+        for x_num, x_emb, y_price, y_dir, _ in loader:
             x_num = x_num.to(DEVICE, non_blocking=True)
             x_emb = x_emb.to(DEVICE, non_blocking=True)
             y_price = y_price.to(DEVICE, non_blocking=True)

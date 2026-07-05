@@ -37,7 +37,7 @@ def _inverse_close(scaled_values: np.ndarray, ticker: str, interval: str,) -> np
     inv = scaler.inverse_transform(dummy)
     return inv[:, close_idx]
 
-def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interval_ids: np.ndarray) -> np.ndarray:
+def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interval_ids: np.ndarray, col_name) -> np.ndarray:
 
     out = np.empty_like(scaled_values, dtype=np.float64)
     pairs = np.stack([ticker_ids, interval_ids], axis=1)
@@ -53,7 +53,18 @@ def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interv
             out[mask] = scaled_values[mask]
             continue
 
-        out[mask] = _inverse_close(scaled_values[mask], ticker, interval)
+        bundle = load_scaler(ticker, interval)
+        if bundle is None or col_name not in bundle[1]:
+            log.warning(f"No scaler for {ticker} @ {interval} or column '{col_name}' not found; leaving {mask.sum()} samples scaled")
+            out[mask] = scaled_values[mask]
+            continue
+
+        scaler, cols = bundle
+        idx = cols.index(col_name)
+        dummy = np.zeros((mask.sum(), len(cols)))
+        dummy[:, idx] = scaled_values[mask]
+
+        out[mask] = scaler.inverse_transform(dummy)[:, idx]
 
     return out
 
@@ -135,9 +146,10 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     all_dir_pred, all_dir_true = [], []
     all_attn = []
     all_emb = []
+    all_last_close = []
 
     with torch.no_grad():
-        for x_num, x_emb, y_price, y_dir in test_loader:
+        for x_num, x_emb, y_price, y_dir, last_close in test_loader:
             x_num = x_num.to(DEVICE)
             x_emb = x_emb.to(DEVICE)
 
@@ -147,6 +159,7 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
 
             all_price_pred.append(price_pred.squeeze(-1).cpu().numpy())
             all_price_true.append(y_price.numpy())
+            all_last_close.append(last_close.numpy())
             all_dir_pred.append(dir_pred.squeeze(-1).cpu().numpy())
             all_dir_true.append(y_dir.numpy())
             all_attn.append(attn.cpu().numpy())
@@ -154,6 +167,7 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
 
     price_pred_sc = np.concatenate(all_price_pred)
     price_true_sc = np.concatenate(all_price_true)
+    last_close_sc = np.concatenate(all_last_close)
     dir_pred_raw = np.concatenate(all_dir_pred)
     dir_true = np.concatenate(all_dir_true)
     attn_all = np.concatenate(all_attn)
@@ -161,8 +175,12 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     ticker_ids, interval_ids = emb_all[:, 0], emb_all[:, 3]
 
     log.info("Inverse-scaling predictions per ticker before computing metrics...")
-    price_pred_sc = _inverse_close_all(price_pred_sc, ticker_ids, interval_ids)
-    price_true_sc = _inverse_close_all(price_true_sc, ticker_ids, interval_ids)
+    true_return = _inverse_close_all(price_true_sc, ticker_ids, interval_ids, col_name="log_return")
+    pred_return = _inverse_close_all(price_pred_sc, ticker_ids, interval_ids, col_name="log_return")
+    raw_last_close = _inverse_close_all(last_close_sc, ticker_ids, interval_ids, col_name="close")
+
+    price_true_sc = raw_last_close * np.exp(true_return)
+    price_pred_sc = raw_last_close * np.exp(pred_return)
 
     mae = np.mean(np.abs(price_pred_sc - price_true_sc))
     rmse = np.sqrt(np.mean((price_pred_sc - price_true_sc) ** 2))
@@ -197,8 +215,7 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
         log.info(f"{k:<18}: {v}")
     log.info(classification_report(dir_true_i, dir_binary, target_names=["DOWN", "UP"], zero_division=0))
 
-    naive_pred = np.roll(price_true_sc, 1)
-    naive_pred[0] = price_true_sc[0]
+    naive_pred = raw_last_close
 
     naive_mae = float(np.mean(np.abs(naive_pred - price_true_sc)))
     naive_rmse = float(np.sqrt(np.mean((naive_pred - price_true_sc) ** 2)))

@@ -28,12 +28,13 @@ def _load_parquet() -> pd.DataFrame:
     log.info(f"Loaded {len(df):,} rows | {df['ticker'].nunique():,} tickers | {df['interval'].nunique():,} intervals")
     return df
 
-def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
+def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int, int]:
 
     log.info("Building groups (fitting scaler on train split only, per ticker/interval)...")
 
     num_cols = [c for c in df.columns if c not in EXCLUDE_COLS]
     close_idx = num_cols.index("close")
+    return_idx = num_cols.index("log_return")
 
     groups = {"train": [], "val": [], "test": []}
 
@@ -73,8 +74,10 @@ def _build_all_groups(df: pd.DataFrame) -> tuple[dict, list, int]:
             emb_arr = g_split[EMB_COLS].values.astype(np.int64)
             groups[name].append((val_arr, emb_arr))
 
-    return groups, num_cols, close_idx
-def verify_no_data_leakage(df, num_cols, close_idx):
+    return groups, num_cols, close_idx, return_idx
+
+
+def verify_no_data_leakage(df, num_cols, close_idx, return_idx):
 
     log.info("Running data leakage verification...")
 
@@ -99,10 +102,11 @@ def verify_no_data_leakage(df, num_cols, close_idx):
 
 class MarketDataset(Dataset):
 
-    def __init__(self, groups, close_idx):
+    def __init__(self, groups, close_idx, return_idx):
 
         self.groups = groups
         self.close_idx = close_idx
+        self.return_idx = return_idx
         self.index = []
 
         for gi, (vala, _) in enumerate(groups):
@@ -127,20 +131,21 @@ class MarketDataset(Dataset):
         return (
             torch.from_numpy(window),
             torch.from_numpy(emb[end - 1]),
-            torch.tensor(vals[target, self.close_idx], dtype=torch.float32),
+            torch.tensor(vals[target, self.return_idx], dtype=torch.float32),
             torch.tensor(float(vals[target, self.close_idx] > vals[end - 1, self.close_idx]), dtype=torch.float32),
+            torch.tensor(vals[end -1, self.close_idx], dtype=torch.float32)
         )
 
 
 def make_dataloaders(force_rebuild: bool = False):
 
     df = _load_parquet()
-    groups_by_split, num_cols, close_idx = _build_all_groups(df)
+    groups_by_split, num_cols, close_idx, return_idx = _build_all_groups(df)
     num_features = len(num_cols)
     loaders = {}
 
     for split in ("train", "val", "test"):
-        ds = MarketDataset(groups_by_split[split], close_idx)
+        ds = MarketDataset(groups_by_split[split], close_idx, return_idx)
         loaders[split] = DataLoader(
             ds,
             batch_size=BATCH_SIZE,
