@@ -83,7 +83,7 @@ def attention_ablation_test(model, test_loader):
     handle = model.attention.register_forward_hook(zero_context_hook)
 
     with torch.no_grad():
-        for x_num, x_emb, y_price, y_dir in test_loader:
+        for x_num, x_emb, y_price, y_dir, _ in test_loader:
             x_num = x_num.to(DEVICE)
             x_emb = x_emb.to(DEVICE)
 
@@ -305,10 +305,10 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     plt.close()
     log.info(f"Attention plot ssaved ->{attn_path}")
 
-    plot_correlation(price_pred_sc, price_true_sc, run_name)
+    plot_correlation(pred_return, true_return, run_name)
 
-    ss_res = np.sum((price_true_sc - price_pred_sc) ** 2)
-    ss_tot = np.sum((price_true_sc - np.mean(price_true_sc)) **2)
+    ss_res = np.sum((true_return - pred_return) ** 2)
+    ss_tot = np.sum((true_return - np.mean(true_return)) ** 2)
     r2 = float(1 - (ss_res / ss_tot))
 
     attention_ablation_test(model, test_loader)
@@ -339,6 +339,13 @@ def _print_scorecard(metrices, naive_mae, model_mae, dir_acc, pred_up_ratio, r2)
         if result:
             passed += 1
     log.info(f"\n Score: {passed}/{len(checks)} checks passed.")
+
+    beats_naive = model_mae < naive_mae
+
+    if not beats_naive:
+        log.info("POOR MODEL PERFORMANCE - model is not learning meaningfully (fails naive baseline)")
+    elif passed >= 7:
+        log.info("EXCELLENT MODEL PERFORMANCE - model is genuinely learning.")
 
     if passed >= 7:
         log.info("EXCELLENT MODEL PERFORMANCE - model is genuinely learning.")

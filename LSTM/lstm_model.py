@@ -62,10 +62,9 @@ class MultiHeadTemporalAttention(nn.Module):
         out = self.out_proj(out)
         out = self.norm(out + x)
 
-        context = out.mean(dim=1)
+        context = out[:, -1, :]
 
-        attn_viz = weights.mean(dim=1)
-        attn_viz = attn_viz.mean(dim=1)
+        attn_viz = weights[:, :, -1, :].mean(dim=1)
 
         return context, attn_viz
 

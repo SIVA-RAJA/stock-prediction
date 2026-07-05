@@ -69,7 +69,7 @@ nvidia-nvtx==13.0.85
 onnx==1.22.0
 onnxruntime==1.27.0
 packaging==26.2
-pandas==3.0.4
+pandas==3.0.3
 peewee==4.1.0
 pillow==12.2.0
 platformdirs==4.10.0

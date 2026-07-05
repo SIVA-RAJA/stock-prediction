@@ -188,9 +188,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
     criterion = MultiTaskLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=SCHEDULER_T0, T_mult=SCHEDULER_T_MULT
-    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
     scaler_amp = torch.amp.grad_scaler.GradScaler(device=DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
@@ -222,7 +220,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
             raise
         val_loss, val_lp, val_ld, val_m = _run_epoch(model, val_loader, criterion, None, scaler_amp, is_train=False)
 
-        scheduler.step()
+        scheduler.step(val_loss)
 
         elapsed = time.time() - t0
 
@@ -272,7 +270,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         if epoch > 10:
             if val_loss > best_val_loss * 1.05:
                 log.warning(f"Val loss {val_loss:.5f} is 5% above best val loss {best_val_loss:.5f} - Possible overfitting.")
-            if abs(gap) > 0.1:
+            if gap < -0.1:
                 log.warning(f"Large gap between train and val loss: {gap:.5f} - model memorizing training data.")
 
     writer.close()
