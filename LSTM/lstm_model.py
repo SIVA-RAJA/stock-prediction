@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn as nn
-from .lstm_config import( TICKER_EMB_DIM, MARKET_EMB_DIM, REGION_EMB_DIM, INTERVAL_EMB_DIM,
+from .lstm_config import( MARKET_EMB_DIM, REGION_EMB_DIM, INTERVAL_EMB_DIM,
                         LSTM_HIDDEN, LSTM_LAYERS, LSTM_DROPOUT,BIDIRECTIONAL, HEAD_HIDDEN, HEAD_DROPOUT, )
 
 
@@ -89,14 +89,13 @@ class PredictionHead(nn.Module):
 
 class MarketLSTM(nn.Module):
 
-    def __init__(self, num_features: int, num_tickers: int, num_markets: int, num_regions: int, num_intervals: int):
+    def __init__(self, num_features: int, num_markets: int, num_regions: int, num_intervals: int):
         super().__init__()
-        self.ticker_emb = nn.Embedding(num_tickers + 1, TICKER_EMB_DIM, padding_idx=0)
         self.market_emb = nn.Embedding(num_markets + 1, MARKET_EMB_DIM, padding_idx=0)
         self.region_emb = nn.Embedding(num_regions + 1, REGION_EMB_DIM, padding_idx=0)
         self.interval_emb = nn.Embedding(num_intervals + 1, INTERVAL_EMB_DIM, padding_idx=0)
 
-        emb_total = TICKER_EMB_DIM + MARKET_EMB_DIM + REGION_EMB_DIM + INTERVAL_EMB_DIM
+        emb_total = MARKET_EMB_DIM + REGION_EMB_DIM + INTERVAL_EMB_DIM
 
         self.input_proj = nn.Sequential(
             nn.Linear(num_features + emb_total, LSTM_HIDDEN),
@@ -142,11 +141,10 @@ class MarketLSTM(nn.Module):
 
         B, T, _ = x_num.shape
 
-        t_emb = self.ticker_emb(x_emb[:, 0])
-        m_emb = self.market_emb(x_emb[:, 1])
-        r_emb = self.region_emb(x_emb[:, 2])
-        i_emb = self.interval_emb(x_emb[:, 3])
-        emb = torch.cat([t_emb, m_emb, r_emb, i_emb], dim=-1)
+        m_emb = self.market_emb(x_emb[:, 0])
+        r_emb = self.region_emb(x_emb[:, 1])
+        i_emb = self.interval_emb(x_emb[:, 2])
+        emb = torch.cat([m_emb, r_emb, i_emb], dim=-1)
         emb_expanded = emb.unsqueeze(1).expand(-1, T, -1)
 
         x = torch.cat([x_num, emb_expanded], dim=-1)
