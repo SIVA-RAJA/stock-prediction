@@ -253,7 +253,8 @@ def build_model_and_loaders(args: argparse.Namespace):
     log.info("Building dataloaders...")
     train_loader, val_loader, test_loader, num_features = make_dataloaders(force_rebuild=args.rebuild)
     import numpy as np
-    print(np.mean([float(y_dir) for *_, y_dir in train_loader.dataset]))
+    dir_balance = np.mean([float(y_dir) for _, _, y_dir, _ in train_loader.dataset])
+    log.info(f"Train set direction balance (mean UP ratio): {dir_balance:.4f}")
 
     model = MarketLSTM(
         num_features=num_features,

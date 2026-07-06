@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from .lstm_config import( TICKER_EMB_DIM, MARKET_EMB_DIM, REGION_EMB_DIM, INTERVAL_EMB_DIM,
-                        LSTM_HIDDEN, LSTM_LAYERS, LSTM_DROPOUT,BIDIRECTIONAL, ATTN_HIDDEN, HEAD_HIDDEN, HEAD_DROPOUT, )
+                        LSTM_HIDDEN, LSTM_LAYERS, LSTM_DROPOUT,BIDIRECTIONAL, HEAD_HIDDEN, HEAD_DROPOUT, )
 
 
 class  PositionalEncoding(nn.Module):
@@ -123,7 +123,6 @@ class MarketLSTM(nn.Module):
 
         self.norm = nn.LayerNorm(lstm_out_dim)
         self.dropout = nn.Dropout(HEAD_DROPOUT)
-        self.price_head = PredictionHead(lstm_out_dim, HEAD_HIDDEN, 1, HEAD_DROPOUT)
         self.dir_head = PredictionHead(lstm_out_dim, HEAD_HIDDEN, 1, HEAD_DROPOUT)
         self._init_weights()
 
@@ -139,7 +138,7 @@ class MarketLSTM(nn.Module):
                     n = param.size(0)
                     param.data[n // 4 : n // 2].fill_(1.0)
 
-    def forward(self, x_num: torch.Tensor, x_emb: torch.Tensor,) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x_num: torch.Tensor, x_emb: torch.Tensor,) -> tuple[torch.Tensor, torch.Tensor]:
 
         B, T, _ = x_num.shape
 
@@ -158,7 +157,6 @@ class MarketLSTM(nn.Module):
         context, attn_weights = self.attention(lstm_out)
         context = self.dropout(self.norm(context))
 
-        price_pred = self.price_head(context)
         dir_pred = self.dir_head(context)
 
-        return price_pred, dir_pred, attn_weights
+        return dir_pred, attn_weights

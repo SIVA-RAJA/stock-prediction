@@ -9,44 +9,36 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 
 from .lstm_config import (
-    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_PRICE, LAMBDA_DIR, LAMBDA_ATTN, GRAD_CLIP, PATIENCE,
-    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
+    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_ATTN, GRAD_CLIP, PATIENCE,
+    MIN_DELTA,BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
 
 class MultiTaskLoss(nn.Module):
-    def __init__(self, lambda_price=LAMBDA_PRICE, lambda_dir=LAMBDA_DIR, lambda_attn=LAMBDA_ATTN):
+    def __init__(self, lambda_attn=LAMBDA_ATTN):
         super().__init__()
-        self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss()
-        self.lp = lambda_price
-        self.ld = lambda_dir
         self.la = lambda_attn
 
-    def forward(self, price_pred, price_true, dir_pred, dir_true, attn_weights) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, dir_pred, dir_true, attn_weights) -> tuple[torch.Tensor, torch.Tensor]:
 
-        loss_price = self.mse(price_pred.squeeze(-1), price_true)
         loss_dir = self.bce(dir_pred.squeeze(-1), dir_true)
 
         eps = 1e-8
         entropy =  -(attn_weights * torch.log(attn_weights + eps)).sum(dim=1).mean()
         l_attn = -entropy
 
-        total = (self.lp * loss_price + self.ld * loss_dir + self.la * l_attn)
-        return total, loss_price, loss_dir
+        total = loss_dir + self.la * l_attn
+        return total, loss_dir
 
-def _compute_metrics(price_preds: np.ndarray, price_trues: np.ndarray, dir_preds: np.ndarray, dir_trues: np.ndarray) -> dict:
+def _compute_metrics(dir_preds: np.ndarray, dir_trues: np.ndarray) -> dict:
 
-    mae = np.mean(np.abs(price_preds - price_trues))
-    rmse = np.sqrt(np.mean((price_preds - price_trues) ** 2))
     dir_binary = (dir_preds >= 0.5).astype(int)
     dir_acc = (dir_binary == dir_trues.astype(int)).mean()
     f1 = f1_score(dir_trues.astype(int), dir_binary, zero_division=0)
 
     return {
-        "mae": mae,
-        "rmse": rmse,
         "dir_acc": dir_acc,
         "f1": f1,
     }
@@ -58,28 +50,26 @@ def _run_epoch(
     optimizer: torch.optim.Optimizer | None,
     scaler_amp,
     is_train: bool,
-) -> tuple[float, float, float, dict]:
+) -> tuple[float, float, dict]:
 
     model.train() if is_train else model.eval()
 
-    total_loss = price_loss_sum = dir_loss_sum = 0.0
-    all_price_pred, all_price_true = [], []
+    total_loss = dir_loss_sum = 0.0
     all_dir_pred, all_dir_true = [], []
 
     ctx = torch.enable_grad() if is_train else torch.no_grad()
     with ctx:
         n_batches = 0
-        for x_num, x_emb, y_price, y_dir, _ in loader:
+        for x_num, x_emb, y_dir, _ in loader:
             x_num = x_num.to(DEVICE, non_blocking=True)
             x_emb = x_emb.to(DEVICE, non_blocking=True)
-            y_price = y_price.to(DEVICE, non_blocking=True)
             y_dir = y_dir.to(DEVICE, non_blocking=True)
 
             try:
                 autocast_device = "cuda" if DEVICE == "cuda" else "cpu"
                 with torch.autocast(device_type=autocast_device, enabled=(USE_AMP and DEVICE=="cuda")):
-                    price_pred, dir_pred, attn_weights = model(x_num, x_emb)
-                    loss, lp, ld = criterion(price_pred, y_price, dir_pred, y_dir, attn_weights)
+                    dir_pred, attn_weights = model(x_num, x_emb)
+                    loss, ld = criterion(dir_pred, y_dir, attn_weights)
 
                 if is_train:
                     assert optimizer is not None, "optimizer must be provided when is_train=True"
@@ -105,28 +95,25 @@ def _run_epoch(
                 raise
 
             total_loss += loss.item()
-            price_loss_sum += lp.item()
             dir_loss_sum += ld.item()
             n_batches += 1
 
             dir_pred = torch.sigmoid(dir_pred)
 
-            all_price_pred.append(price_pred.squeeze(-1).detach().cpu().numpy())
-            all_price_true.append(y_price.detach().cpu().numpy())
             all_dir_pred.append(dir_pred.squeeze(-1).detach().cpu().numpy())
             all_dir_true.append(y_dir.detach().cpu().numpy())
 
     n = max(n_batches, 1)
-    if not all_price_pred:
-        raise RuntimeError("All batches were skipped (OOM) this epoch — reduce BATCH_SIZE.")
+
+    if not all_dir_pred:
+        log.warning("No valid batches were processed in this epoch.")
+
     metrics = _compute_metrics(
-        np.concatenate(all_price_pred),
-        np.concatenate(all_price_true),
         np.concatenate(all_dir_pred),
         np.concatenate(all_dir_true),
     )
 
-    return total_loss / n, price_loss_sum / n, dir_loss_sum / n, metrics
+    return total_loss / n, dir_loss_sum / n, metrics
 
 
 class EarlyStopping:
@@ -213,12 +200,12 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
         t0 = time.time()
         try:
-         tr_loss, tr_lp, tr_ld, tr_m = _run_epoch(model, train_loader, criterion, optimizer, scaler_amp, is_train=True)
+         tr_loss,tr_ld, tr_m = _run_epoch(model, train_loader, criterion, optimizer, scaler_amp, is_train=True)
         except RuntimeError as e:
             log.error(f"Training crashed: {e}")
             torch.cuda.empty_cache()
             raise
-        val_loss, val_lp, val_ld, val_m = _run_epoch(model, val_loader, criterion, None, scaler_amp, is_train=False)
+        val_loss,val_ld, val_m = _run_epoch(model, val_loader, criterion, None, scaler_amp, is_train=False)
 
         scheduler.step(val_loss)
 
@@ -236,17 +223,12 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
         log.info(f"Epoch {epoch}/{NUM_EPOCHS} |"
                  f" LR: {optimizer.param_groups[0]['lr']:.8f} | "
                  f"Time: {elapsed:.2f}s {gpu_str} | "
-                 f"Train Loss: {tr_loss:.6f} (Price: {tr_lp:.6f}, Dir: {tr_ld:.6f}) | "
-                 f"Val Loss: {val_loss:.6f} (Price: {val_lp:.6f}, Dir: {val_ld:.6f}) | "
                  f"Gap: {val_loss - tr_loss:.6f} | "
                  f"Best Val Loss: {best_val_loss:.6f} | "
-                 f"Val Metrics: MAE: {val_m['mae']:.6f}, RMSE: {val_m['rmse']:.6f}, Dir Acc: {val_m['dir_acc']:.6f}, F1: {val_m['f1']:.6f}")
+                 f"Dir Acc: {val_m['dir_acc']:.6f}, F1: {val_m['f1']:.6f}")
 
         writer.add_scalars("Loss/total", {"train": tr_loss, "val": val_loss}, epoch)
-        writer.add_scalars("Loss/price", {"train": tr_lp, "val": val_lp}, epoch)
         writer.add_scalars("Loss/direction", {"train": tr_ld, "val": val_ld}, epoch)
-        writer.add_scalars("Metrics/MAE", {"train": tr_m["mae"], "val": val_m["mae"]}, epoch)
-        writer.add_scalars("Metrics/RMSE", {"train": tr_m["rmse"], "val": val_m["rmse"]}, epoch)
         writer.add_scalars("Metrics/Direction Accuracy", {"train": tr_m["dir_acc"], "val": val_m["dir_acc"]}, epoch)
         writer.add_scalars("Metrics/F1 Score", {"train": tr_m["f1"], "val": val_m["f1"]}, epoch)
         writer.add_scalar("Learning Rate", optimizer.param_groups[0]["lr"], epoch)

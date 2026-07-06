@@ -29,8 +29,8 @@ st.set_page_config(
     page_icon="📈",
     layout="centered",
     )
-st.title("Stock Price Prediction")
-st.caption("This app predicts the next day's closing price of a stock using an LSTM model.")
+st.title("Stock Direction Predictor")
+st.caption("This app predicts the next day's price direction (UP/DOWN) using an LSTM model.")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -53,12 +53,11 @@ if run:
             st.stop()
     st.success(f"Prediction as of {result['as_of']}")
 
-    m1, m2, m3 = st.columns(3)
+    m1, m2 = st.columns(2)
 
     m1.metric(label="Last Close Price", value=f"${result['last_close']:.2f}")
-    m2.metric(label="Predicted Close Price", value=f"${result['predicted_next_close']:.2f}", delta=f"{result['predicted_change_pct']:.2f}%")
-    m3.metric(label="Direction", value=result['direction'], delta=f"{result['direction_confidence']:.1%} confidence")
-    
+    m2.metric(label="Direction", value=result['direction'], delta=f"{result['direction_confidence']:.1%} confidence")
+
     st.subheader("Attention over input window")
     attn = result["attention_weights"]
     attn_df = pd.DataFrame({"timestep (0=oldest, -1=most recent)": list(range(len(attn))), "attention_weight": attn}).set_index("timestep (0=oldest, -1=most recent)")
@@ -69,7 +68,7 @@ if run:
 
 st.divider()
 st.caption(
-    "This tool re-run the exact trainning features pipeline (clean -> features -> saved scaler)"
-    "on freshly downloaded data from Yahoo Finance, and then feeds the last window into the exported ONNX model."
-    "This app is for educational purposes only."
-    "It is not financial advice. Use at your own risk.")
+    "This tool re-runs the exact training features pipeline (clean -> features -> saved scaler) "
+    "on freshly downloaded data from Yahoo Finance, and feeds the last window into the exported ONNX model "
+    "to predict next-period price direction. "
+    "This app is for educational purposes only. It is not financial advice. Use at your own risk.")

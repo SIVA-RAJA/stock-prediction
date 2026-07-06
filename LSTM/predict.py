@@ -177,13 +177,10 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
                            f"features.py has changed since the model was exported. Please re-run the training pipeline to generate a new model.")
 
     raw_outputs = sess.run(None, {"x_num": x_num, "x_emb": x_emb})
-    price_pred_sc, dir_pred_logit, attn_weights = (np.array(o) for o in raw_outputs)
+    dir_pred_logit, attn_weights = (np.array(o) for o in raw_outputs)
 
-    price_pred_scaled = float(price_pred_sc.squeeze())
     dir_prob = float(1.0 / (1.0 + np.exp(-dir_pred_logit.squeeze())))
     dir_label = "UP" if dir_prob >= 0.5 else "DOWN"
-
-    predicted_price = _inverse_close(price_pred_scaled, ticker=ticker, interval=interval)
 
     last_raw_close = float(raw_df["close"].iloc[-1])
 
@@ -196,15 +193,13 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
         "interval": interval,
         "as_of": str(last_timestamp),
         "last_close": round(last_raw_close, 4),
-        "predicted_next_close": round(predicted_price, 4),
-        "predicted_change_pct": round((predicted_price - last_raw_close) / last_raw_close * 100, 4),
         "direction" : dir_label,
         "direction_confidence": round(dir_prob, 4),
         "attention_weights": attn_weights.squeeze().tolist(),
     }
 
-    log.info(f"{ticker} @ {interval} | Last Close: {result['last_close']:.4f} | Predicted Next Close: {result['predicted_next_close']:.4f}"
-             f"Change %: {result['predicted_change_pct']:.4f}% | Direction: {result['direction']} (Confidence: {result['direction_confidence']:.4f})")
+    log.info(f"{ticker} @ {interval} | Last Close: {result['last_close']:.4f} | "
+             f"Direction: {result['direction']} (Confidence: {result['direction_confidence']:.4f})")
 
     return result
 

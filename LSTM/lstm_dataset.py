@@ -102,11 +102,10 @@ def verify_no_data_leakage(df, num_cols, close_idx, return_idx):
 
 class MarketDataset(Dataset):
 
-    def __init__(self, groups, close_idx, return_idx):
+    def __init__(self, groups, close_idx):
 
         self.groups = groups
         self.close_idx = close_idx
-        self.return_idx = return_idx
         self.index = []
 
         for gi, (vala, _) in enumerate(groups):
@@ -131,7 +130,6 @@ class MarketDataset(Dataset):
         return (
             torch.from_numpy(window),
             torch.from_numpy(emb[end - 1]),
-            torch.tensor(vals[target, self.return_idx], dtype=torch.float32),
             torch.tensor(float(vals[target, self.close_idx] > vals[end - 1, self.close_idx]), dtype=torch.float32),
             torch.tensor(vals[end -1, self.close_idx], dtype=torch.float32)
         )
@@ -145,7 +143,7 @@ def make_dataloaders(force_rebuild: bool = False):
     loaders = {}
 
     for split in ("train", "val", "test"):
-        ds = MarketDataset(groups_by_split[split], close_idx, return_idx)
+        ds = MarketDataset(groups_by_split[split], close_idx)
         loaders[split] = DataLoader(
             ds,
             batch_size=BATCH_SIZE,

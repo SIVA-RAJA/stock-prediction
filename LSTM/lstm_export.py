@@ -21,11 +21,10 @@ def export_onnx(model, num_features: int):
         opset_version=18,
         dynamo=False,
         input_names=["x_num", "x_emb"],
-        output_names=["price_pred", "dir_pred", "attn_weights"],
+        output_names=["dir_pred", "attn_weights"],
         dynamic_axes={
             "x_num": {0: "batch_size"},
             "x_emb": {0: "batch_size"},
-            "price_pred": {0: "batch_size"},
             "dir_pred": {0: "batch_size"},
             "attn_weights": {0: "batch_size"},
         },
@@ -45,5 +44,5 @@ def verify_onnx(num_features: int):
 
     outputs = sess.run(None, {"x_num": dummy_num, "x_emb": dummy_emb})
     log.info(f"ONNX verified - output shapes: {[np.asanyarray(o).shape for o in outputs]}")
-    
+
     return outputs
