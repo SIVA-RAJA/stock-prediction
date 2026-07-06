@@ -181,6 +181,7 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
 
     dir_prob = float(1.0 / (1.0 + np.exp(-dir_pred_logit.squeeze())))
     dir_label = "UP" if dir_prob >= 0.5 else "DOWN"
+    dir_confidence = dir_prob if dir_label == "UP" else 1.0 - dir_prob
 
     last_raw_close = float(raw_df["close"].iloc[-1])
 
@@ -194,7 +195,7 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
         "as_of": str(last_timestamp),
         "last_close": round(last_raw_close, 4),
         "direction" : dir_label,
-        "direction_confidence": round(dir_prob, 4),
+        "direction_confidence": round(dir_confidence, 4),
         "attention_weights": attn_weights.squeeze().tolist(),
     }
 

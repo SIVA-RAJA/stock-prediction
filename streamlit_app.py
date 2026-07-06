@@ -53,10 +53,24 @@ if run:
             st.stop()
     st.success(f"Prediction as of {result['as_of']}")
 
+    direction = result['direction']
+    confidence = result['direction_confidence']
+
+    color = "#16c784" if direction == "UP" else "#ea3943"   # green / red
+    arrow = "▲" if direction == "UP" else "▼"
+
+
     m1, m2 = st.columns(2)
 
     m1.metric(label="Last Close Price", value=f"${result['last_close']:.2f}")
-    m2.metric(label="Direction", value=result['direction'], delta=f"{result['direction_confidence']:.1%} confidence")
+    m2.markdown(f"""
+                    <div style="font-size: 0.9rem; color: gray;">Direction</div>
+                    <div style="font-size: 2rem; font-weight: 600; color: {color};">
+                    {arrow} {direction}
+                    </div>
+                """, unsafe_allow_html=True)
+
+    st.caption(f"Model confidence: {confidence:.1%}")
 
     st.subheader("Attention over input window")
     attn = result["attention_weights"]

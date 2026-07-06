@@ -7,19 +7,24 @@ venv
 .env
 env
 
+*__pycache__/
 
+artifacts/*
 */dataset/*
+*/runs/*
+*/checkpoints/*
+*/evaluation/*
+*/logs/*
+*/model/*
+
 *.hd5
 *.parquet
 *.joblib
 *.pkl
+*.onnx
+*.onnx.data
+*.pt
 
 .ruff_cache/
 .ruff*
 
-artifacts/*
-dataset/*
-runs/*
-checkpoints/*
-logs/*
-model/*

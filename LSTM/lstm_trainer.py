@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 class MultiTaskLoss(nn.Module):
     def __init__(self, lambda_attn=LAMBDA_ATTN):
         super().__init__()
-        self.bce = nn.BCEWithLogitsLoss()
+        self.bce = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.1]).to(DEVICE))
         self.la = lambda_attn
 
     def forward(self, dir_pred, dir_true, attn_weights) -> tuple[torch.Tensor, torch.Tensor]:
