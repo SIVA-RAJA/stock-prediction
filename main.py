@@ -258,7 +258,6 @@ def build_model_and_loaders(args: argparse.Namespace):
 
     model = MarketLSTM(
         num_features=num_features,
-        num_tickers=len(TICKER_TO_ID),
         num_markets=len(MARKET_TO_ID),
         num_regions=len(REGION_TO_ID),
         num_intervals=len(INTERVAL_TO_ID),

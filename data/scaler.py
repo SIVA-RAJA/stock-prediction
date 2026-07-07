@@ -25,12 +25,12 @@ def _scalable_cols(df: pd.DataFrame) -> list[str]:
         cols.append(col)
     return cols
 
-def _scaler_path(ticker: str, interval: str, ) -> Path:
+def _scaler_path(key: str, interval: str, ) -> Path:
 
-    safe_ticker = ticker.replace("/", "_").replace("^", "_").replace("=", "_")
-    return SCALER_DIR / f"{safe_ticker}_{interval}.joblib"
+    safe_key = key.replace("/", "_").replace("^", "_").replace("=", "_")
+    return SCALER_DIR / f"{safe_key}_{interval}.joblib"
 
-def fit_and_scale(df: pd.DataFrame, ticker: str, interval: str, save: bool = True) -> tuple[pd.DataFrame, RobustScaler, list[str]]:
+def fit_and_scale(df: pd.DataFrame, key: str, interval: str, save: bool = True) -> tuple[pd.DataFrame, RobustScaler, list[str]]:
 
     df = df.copy()
     cols = _scalable_cols(df)
@@ -42,16 +42,16 @@ def fit_and_scale(df: pd.DataFrame, ticker: str, interval: str, save: bool = Tru
 
 
     if save:
-        path = _scaler_path(ticker, interval)
+        path = _scaler_path(key, interval)
         joblib.dump({"scaler": scaler, "cols": cols}, path)
         log.debug(f"Scaler saved to {path.name}")
 
     return df, scaler, cols
 
 
-def load_scaler(ticker: str, interval: str) -> tuple[RobustScaler, list[str]] | None:
+def load_scaler(key: str, interval: str) -> tuple[RobustScaler, list[str]] | None:
 
-    path = _scaler_path(ticker, interval)
+    path = _scaler_path(key, interval)
     if not path.exists():
         log.warning(f"Scaler file not found: {path.name}")
         return None
@@ -61,9 +61,9 @@ def load_scaler(ticker: str, interval: str) -> tuple[RobustScaler, list[str]] | 
     return data["scaler"], data["cols"]
 
 
-def inverse_scale(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame | None:
+def inverse_scale(df: pd.DataFrame, key: str, interval: str) -> pd.DataFrame | None:
 
-    scaler_data = load_scaler(ticker, interval)
+    scaler_data = load_scaler(key, interval)
     if scaler_data is None:
         return None
 

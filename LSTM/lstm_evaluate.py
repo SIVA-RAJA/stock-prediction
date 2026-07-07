@@ -20,25 +20,25 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 
-def _inverse_close_all(scaled_values: np.ndarray, ticker_ids: np.ndarray, interval_ids: np.ndarray, col_name) -> np.ndarray:
+def _inverse_close_all(scaled_values: np.ndarray, market_ids: np.ndarray, interval_ids: np.ndarray, col_name) -> np.ndarray:
 
     out = np.empty_like(scaled_values, dtype=np.float64)
-    pairs = np.stack([ticker_ids, interval_ids], axis=1)
+    pairs = np.stack([market_ids, interval_ids], axis=1)
     unique_pairs = np.unique(pairs, axis=0)
 
-    for ticker_id, interval_id in unique_pairs:
-        ticker = ID_TO_TICKER.get(int(ticker_id))
+    for market_id, interval_id in unique_pairs:
+        market = ID_TO_TICKER.get(int(market_id))
         interval = ID_TO_INTERVAL.get(int(interval_id))
-        mask = (ticker_ids == ticker_id) & (interval_ids == interval_id)
+        mask = (market_ids == market_id) & (interval_ids == interval_id)
 
-        if ticker is None or interval is None:
-            log.warning(f"Unknown ticker_id={ticker_id}/interval_id={interval_id}; leaving {mask.sum()} samples scaled")
+        if market is None or interval is None:
+            log.warning(f"Unknown market_id={market_id}/interval_id={interval_id}; leaving {mask.sum()} samples scaled")
             out[mask] = scaled_values[mask]
             continue
 
-        bundle = load_scaler(ticker, interval)
+        bundle = load_scaler(market, interval)
         if bundle is None or col_name not in bundle[1]:
-            log.warning(f"No scaler for {ticker} @ {interval} or column '{col_name}' not found; leaving {mask.sum()} samples scaled")
+            log.warning(f"No scaler for {market} @ {interval} or column '{col_name}' not found; leaving {mask.sum()} samples scaled")
             out[mask] = scaled_values[mask]
             continue
 
@@ -119,10 +119,10 @@ def evaluate(model: nn.Module, test_loader: DataLoader, run_name: str="eval", ) 
     dir_true = np.concatenate(all_dir_true)
     attn_all = np.concatenate(all_attn)
     emb_all = np.concatenate(all_emb)
-    ticker_ids, interval_ids = emb_all[:, 0], emb_all[:, 3]
+    market_ids, interval_ids, ticker_ids = emb_all[:, 0], emb_all[:, 2], emb_all[:, 3]
 
     log.info("Inverse-scaling predictions per ticker before computing metrics...")
-    raw_last_close = _inverse_close_all(last_close_sc, ticker_ids, interval_ids, col_name="close")
+    raw_last_close = _inverse_close_all(last_close_sc, market_ids, interval_ids, col_name="close")
 
     dir_binary = (dir_pred_raw >= 0.5).astype(int)
     dir_true_i = dir_true.astype(int)

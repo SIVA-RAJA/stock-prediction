@@ -38,7 +38,7 @@ CONFIGS = {
     "90m": ("60d",  "90m"),
     "1h":  ("730d", "1h"),
     "1d":  ("max",  "1d"),
-    "5d": ("max",  "5d"),
+    "5d":  ("max",  "5d"),
     "1wk": ("max",  "1wk"),
     "1mo": ("max",  "1mo"),
     "3mo": ("max",  "3mo"),
@@ -121,6 +121,7 @@ TICKER_TO_ID, MARKET_TO_ID, REGION_TO_ID, INTERVAL_TO_ID = build_embeddings_maps
 
 ID_TO_TICKER = {v: k for k, v in TICKER_TO_ID.items()}
 ID_TO_INTERVAL = {v: k for k, v in INTERVAL_TO_ID.items()}
+ID_TO_MARKET = {v: k for k, v in MARKET_TO_ID.items()}
 
 
 MIN_ROWS = 30

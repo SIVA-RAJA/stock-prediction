@@ -81,11 +81,11 @@ def _build_features(raw_df: pd.DataFrame, ticker: str, market: str, region: str,
     return featured
 
 
-def _apply_scaler(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame:
+def _apply_scaler(df: pd.DataFrame, market: str, interval: str) -> pd.DataFrame:
 
-    bundle = load_scaler(ticker=ticker, interval=interval)
+    bundle = load_scaler(key=market, interval=interval)
     if bundle is None:
-        raise RuntimeError(f"Scaler loading failed for ticker: {ticker}, interval: {interval}")
+        raise RuntimeError(f"Scaler loading failed for market: {market}, interval: {interval}")
 
     scaler, saved_cols = bundle
 
@@ -95,7 +95,7 @@ def _apply_scaler(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame:
     if current_cols != list(saved_cols):
         missing = set(saved_cols) - set(current_cols)
         extra = set(current_cols) - set(saved_cols)
-        raise RuntimeError(f"Scaler columns mismatch for ticker: {ticker}, interval: {interval}. Expected columns: {saved_cols}, got: {current_cols}. Missing: {missing}, Extra: {extra}"
+        raise RuntimeError(f"Scaler columns mismatch for market: {market}, interval: {interval}. Expected columns: {saved_cols}, got: {current_cols}. Missing: {missing}, Extra: {extra}"
                            f"This means feature.py / config.py has changed since the scaler was saved. Please re-run the training pipeline to generate a new scaler.")
 
     df[saved_cols] = scaler.transform(df[saved_cols])
@@ -104,9 +104,9 @@ def _apply_scaler(df: pd.DataFrame, ticker: str, interval: str) -> pd.DataFrame:
     return df
 
 
-def _inverse_close(scaled_value: float, ticker: str, interval: str) -> float:
+def _inverse_close(scaled_value: float, market: str, interval: str) -> float:
 
-    bundle = load_scaler(ticker=ticker, interval=interval)
+    bundle = load_scaler(key=market, interval=interval)
     if bundle is None:
         return scaled_value
 
@@ -160,7 +160,7 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
     featured = _build_features(raw_df, ticker=ticker, market=market, region=region, interval=interval)
 
     log.info(f"Applying scaler (transform only, no re-fit) for {ticker} at interval {interval}....")
-    scaled = _apply_scaler(featured, ticker=ticker, interval=interval)
+    scaled = _apply_scaler(featured, market=market, interval=interval)
 
     num_cols = [c for c in scaled.columns if c not in EXCLUDE_COLS]
 
