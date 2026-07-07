@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
 from .lstm_config import DEVICE, EVAL_DIR
-from data.config import ID_TO_INTERVAL, ID_TO_TICKER
+from data.config import ID_TO_INTERVAL, ID_TO_MARKET
 from data.scaler import load_scaler
 
 
@@ -27,7 +27,7 @@ def _inverse_close_all(scaled_values: np.ndarray, market_ids: np.ndarray, interv
     unique_pairs = np.unique(pairs, axis=0)
 
     for market_id, interval_id in unique_pairs:
-        market = ID_TO_TICKER.get(int(market_id))
+        market = ID_TO_MARKET.get(int(market_id))
         interval = ID_TO_INTERVAL.get(int(interval_id))
         mask = (market_ids == market_id) & (interval_ids == interval_id)
 
