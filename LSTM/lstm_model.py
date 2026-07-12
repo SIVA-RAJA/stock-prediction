@@ -117,7 +117,7 @@ class MarketLSTM(nn.Module):
         self.attention = MultiHeadTemporalAttention(
             hidden_dim=lstm_out_dim,
             num_heads=8,
-            temperature=0.5,
+            temperature=1.0,
             dropout=0.1)
 
         self.norm = nn.LayerNorm(lstm_out_dim)

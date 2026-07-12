@@ -51,7 +51,6 @@ if run:
         except Exception as e:
             st.error(f"Prediction failed: {e}")
             st.stop()
-    st.success(f"Prediction as of {result['as_of']}")
 
     direction = result['direction']
     confidence = result['direction_confidence']
@@ -62,7 +61,7 @@ if run:
 
     m1, m2 = st.columns(2)
 
-    m1.metric(label="Last Close Price", value=f"${result['last_close']:.2f}")
+    m1.metric(label="Last Close Price", value=f"{result['last_close']:.2f}")
     m2.markdown(f"""
                     <div style="font-size: 0.9rem; color: gray;">Direction</div>
                     <div style="font-size: 2rem; font-weight: 600; color: {color};">

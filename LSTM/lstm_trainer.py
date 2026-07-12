@@ -27,9 +27,9 @@ class MultiTaskLoss(nn.Module):
 
         eps = 1e-8
         entropy =  -(attn_weights * torch.log(attn_weights + eps)).sum(dim=1).mean()
-        l_attn = -entropy
+        #l_attn = -entropy
 
-        total = loss_dir + self.la * l_attn
+        total = loss_dir + self.la * entropy
         return total, loss_dir
 
 def _compute_metrics(dir_preds: np.ndarray, dir_trues: np.ndarray) -> dict:

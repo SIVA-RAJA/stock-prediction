@@ -192,7 +192,6 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
         "market": market,
         "region": region,
         "interval": interval,
-        "as_of": str(last_timestamp),
         "last_close": round(last_raw_close, 4),
         "direction" : dir_label,
         "direction_confidence": round(dir_confidence, 4),
@@ -200,7 +199,7 @@ def predict(ticker: str, market: str, region: str, interval: str) -> dict[str, A
     }
 
     log.info(f"{ticker} @ {interval} | Last Close: {result['last_close']:.4f} | "
-             f"Direction: {result['direction']} (Confidence: {result['direction_confidence']:.4f})")
+             f"Direction: {result['direction']} (Confidence: {result['direction_confidence'] * 100:.2f}%)")
 
     return result
 

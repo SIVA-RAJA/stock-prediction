@@ -53,39 +53,45 @@ def _inverse_close_all(scaled_values: np.ndarray, market_ids: np.ndarray, interv
 
 
 def attention_ablation_test(model, test_loader):
-
     model.eval()
     model.to(DEVICE)
-    normal_preds = []
-    ablated_preds = []
 
     def zero_context_hook(module, input, output):
         context, attn_weights = output
         return torch.zeros_like(context), attn_weights
 
-    handle = model.attention.register_forward_hook(zero_context_hook)
+    normal_preds = []
+    ablated_preds = []
 
     with torch.no_grad():
-        for x_num, x_emb, y_dir, _ in test_loader:
+        for i, (x_num, x_emb, y_dir, _) in enumerate(test_loader):
             x_num = x_num.to(DEVICE)
             x_emb = x_emb.to(DEVICE)
-
             dir_out, _ = model(x_num, x_emb)
             normal_preds.append(dir_out.cpu().numpy())
-
-            if len(normal_preds) > 10:
+            if i >= 10:
                 break
 
+    handle = model.attention.register_forward_hook(zero_context_hook)
+    with torch.no_grad():
+        for i, (x_num, x_emb, y_dir, _) in enumerate(test_loader):
+            x_num = x_num.to(DEVICE)
+            x_emb = x_emb.to(DEVICE)
+            dir_out, _ = model(x_num, x_emb)
+            ablated_preds.append(dir_out.cpu().numpy())
+            if i >= 10:
+                break
     handle.remove()
 
     normal = np.concatenate(normal_preds)
-    diff = np.mean(np.abs(normal))
+    ablated = np.concatenate(ablated_preds)
+    diff = np.mean(np.abs(normal - ablated))
 
     log.info("------------ Attention Ablation Test ----------------")
     if diff < 0.001:
-        log.warning("Model ignoring attention - predictions unchanged")
+        log.warning(f"Model ignoring attention - predictions barely changed (mean diff={diff:.6f})")
     else:
-        log.info(f"Model using attention - mean changed : {diff:.6f})")
+        log.info(f"Model using attention - mean prediction change: {diff:.6f}")
 
 
 
