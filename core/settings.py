@@ -1,7 +1,3 @@
-"""
-Django settings for core project — production-ready for Render / Railway.
-"""
-
 import os
 from pathlib import Path
 import environ
@@ -19,13 +15,21 @@ def _env_list(name: str, default: str = "") -> list[str]:
     """Read a comma-separated env var as a list of strings.
     (django-environ's own env.list() has type stubs that trip up
     pyright/pylance on a plain `default=[]`, so we do it by hand.)
+
+    Also tolerates accidental JSON-array-looking values (e.g. someone
+    setting the env var to the literal text "[]" or '[""]' in a
+    dashboard) by stripping brackets/quotes, instead of letting a stray
+    value like that crash the whole app at startup via corsheaders.E013.
     """
-    raw = env.str(name, default=default)
-    return [item.strip() for item in raw.split(",") if item.strip()]
+    raw = env.str(name, default=default).strip()
+    if raw in ("", "[]"):
+        return []
+    raw = raw.strip("[]")
+    items = [item.strip().strip('"').strip("'") for item in raw.split(",")]
+    return [item for item in items if item]
 
 
-# ALLOWED_HOSTS: read from env (comma-separated), and auto-add the platform's
-# external hostname so you don't have to hardcode it after every redeploy.
+
 ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS')
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -36,8 +40,7 @@ RAILWAY_STATIC_URL = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
 if RAILWAY_STATIC_URL:
     ALLOWED_HOSTS.append(RAILWAY_STATIC_URL)
 
-# CORS: comma-separated list of frontend origins allowed to call this API,
-# e.g. https://your-app.streamlit.app
+
 CORS_ALLOWED_ORIGINS = _env_list('CORS_ALLOWED_ORIGINS')
 
 INSTALLED_APPS = [
@@ -55,7 +58,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',   # serves static files in prod
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -107,8 +110,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files — WhiteNoise serves these directly from the Django process,
-# no separate static file host needed.
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
