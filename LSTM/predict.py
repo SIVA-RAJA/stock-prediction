@@ -30,8 +30,7 @@ from data.cleaner import clean_data
 from data.features import add_featurers
 from data.scaler import load_scaler, _scalable_cols
 
-from .lstm_config import SEQ_LEN
-from .lstm_dataset import EMB_COLS, EXCLUDE_COLS
+from .lstm_config import SEQ_LEN, EMB_COLS, EXCLUDE_COLS
 from .lstm_export import ONNX_PATH
 
 
