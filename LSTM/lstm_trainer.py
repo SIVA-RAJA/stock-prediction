@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score
 
 from .lstm_config import (
     DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_ATTN, GRAD_CLIP, PATIENCE,
-    MIN_DELTA,BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
+    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
 )
 
 log = logging.getLogger(__name__)
@@ -175,7 +175,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
 
     criterion = MultiTaskLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=SCHEDULER_T0, T_mult=SCHEDULER_T_MULT)
     scaler_amp = torch.amp.grad_scaler.GradScaler(device=DEVICE, enabled=(USE_AMP and DEVICE == "cuda"))
     early_stop = EarlyStopping()
     writer = SummaryWriter(log_dir=str(LOG_DIR / run_name))
@@ -207,7 +207,7 @@ def train(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, ru
             raise
         val_loss,val_ld, val_m = _run_epoch(model, val_loader, criterion, None, scaler_amp, is_train=False)
 
-        scheduler.step(val_loss)
+        scheduler.step()
 
         elapsed = time.time() - t0
 

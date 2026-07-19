@@ -1,20 +1,23 @@
-
 *.venv
 .venv
 venv
 
+!.env.example
 *.env
 .env
 env
 
 *__pycache__/
 
+# --- ML artifacts ---
+# Ignore raw datasets, training runs, checkpoints, logs, and evaluation
+# results — these are large/regenerable and shouldn't live in git.
 artifacts/*
-*/dataset/*
 */runs/*
 */checkpoints/*
 */evaluation/*
 */logs/*
+*/dataset/*
 */model/*
 
 *.hd5
@@ -25,6 +28,24 @@ artifacts/*
 *.onnx.data
 *.pt
 
+# --- Deployment exceptions ---
+# The lines above ignore *everything* under artifacts/, including the two
+# things the deployed app actually needs at runtime: the exported ONNX
+# model and the fitted scalers. Un-ignore just those, explicitly.
+# NOTE: order matters — these negations must come after the broad rules
+# above, and every parent directory in the path needs its own "!" too,
+# or git won't look inside it in the first place.
+!artifacts/
+!artifacts/model/
+!artifacts/model/*.onnx
+!artifacts/model/*.onnx.data
+!artifacts/dataset/
+!artifacts/dataset/scalers/
+!artifacts/dataset/scalers/**
+
 .ruff_cache/
 .ruff*
 
+*migrations/
+
+*.sqlite3
