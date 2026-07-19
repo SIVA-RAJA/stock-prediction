@@ -9,7 +9,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 from sklearn.metrics import (f1_score, precision_score, recall_score, classification_report)
-from .lstm_config import DEVICE, EVAL_DIR
+from .lstm_config import EVAL_DIR
+from .lstm_training_config import DEVICE
 from data.config import ID_TO_INTERVAL, ID_TO_MARKET
 from data.scaler import load_scaler
 

@@ -8,9 +8,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 
-from .lstm_config import (
-    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, LAMBDA_ATTN, GRAD_CLIP, PATIENCE,
-    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, LOG_DIR, USE_AMP
+
+from .lstm_config import LAMBDA_ATTN, LOG_DIR
+
+from .lstm_training_config import (
+    DEVICE, NUM_EPOCHS, LEARNING_RATE, WEIGHT_DECAY, GRAD_CLIP, PATIENCE,
+    MIN_DELTA, SCHEDULER_T0, SCHEDULER_T_MULT, BEST_CKPT, RESUME_CKPT, USE_AMP
 )
 
 log = logging.getLogger(__name__)
