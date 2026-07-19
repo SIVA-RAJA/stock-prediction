@@ -117,16 +117,6 @@ if run:
 
     st.caption(f"Model confidence: {confidence:.1%}")
 
-    st.subheader("Attention over input window")
-    attn = result["attention_weights"]
-    attn_df = pd.DataFrame(
-        {"timestep (0=oldest, -1=most recent)": list(range(len(attn))), "attention_weight": attn}
-    ).set_index("timestep (0=oldest, -1=most recent)")
-    st.bar_chart(attn_df)
-
-    with st.expander("Raw results"):
-        st.json(result)
-
 st.divider()
 st.caption(
     "This tool re-runs the exact training features pipeline (clean -> features -> saved scaler) "
