@@ -1,10 +1,8 @@
 import torch
 import logging
-from .lstm_config import MODEL_DIR, SEQ_LEN
+from .lstm_config import ONNX_PATH, SEQ_LEN
 
 log = logging.getLogger(__name__)
-ONNX_PATH = MODEL_DIR / "market_lstm.onnx"
-MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 def export_onnx(model, num_features: int):
 

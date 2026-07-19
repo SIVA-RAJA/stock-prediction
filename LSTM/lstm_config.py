@@ -4,8 +4,9 @@ CHECKPOINT_DIR = ARTIFACTS_DIR / "checkpoints"
 MODEL_DIR = ARTIFACTS_DIR / "model"
 EVAL_DIR = ARTIFACTS_DIR / "evaluation"
 LOG_DIR = ARTIFACTS_DIR / "runs"
+ONNX_PATH = MODEL_DIR / "market_lstm.onnx"
 
-for d in [CHECKPOINT_DIR, MODEL_DIR, EVAL_DIR, LOG_DIR]:
+for d in [CHECKPOINT_DIR, MODEL_DIR, EVAL_DIR, LOG_DIR, ONNX_PATH.parent]:
     d.mkdir(parents=True, exist_ok=True)
 
 CACHE_SIZE = 10
